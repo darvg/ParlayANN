@@ -73,7 +73,7 @@ QUERY_LABELS = args['query_labels']
 GT_FILE = args['gt_file']
 
 
-os.environ["PARLAY_NUM_THREADS"] = "2"
+os.environ["PARLAY_NUM_THREADS"] = "64"
 
 
 print("----- Building Squared IVF index... -----")
