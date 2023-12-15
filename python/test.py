@@ -1,13 +1,29 @@
 import pandas as pd
-from datetime import datetime
 import time
 from collections import defaultdict
 
 import os
 import _ParlayANNpy as pann
+import argparse
 import numpy as np
 import wrapper as wp
 from scipy.sparse import csr_matrix
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="derive statistics for labels in labels file")
+    parser.add_argument('--base_data', metavar='base_data', type=str,
+                        help='base data in diskann format')
+    parser.add_argument('--base_labels', metavar='base_labels', type=str,
+                        help='base labels in spmat format')
+    parser.add_argument('--query_data', metavar='query_data', type=str,
+                        help='query data in diskann format')
+    parser.add_argument('--query_labels', metavar='out_file', type=str,
+                        help='query labels in spmat format')
+    parser.add_argument('--gt_file', metavar='out_file', type=str,
+                        help='gt file in diskann format')
+    return vars(parser.parse_args())
+
 
 
 def mmap_sparse_matrix_fields(fname):
@@ -49,31 +65,21 @@ def read_sparse_matrix(fname, do_mmap=False):
 
 
 print(dir(pann))
+args = build_parser()
+BASE_DATA = args['base_data']
+BASE_LABELS = args['base_labels']
+QUERY_DATA = args['query_data']
+QUERY_LABELS = args['query_labels']
+GT_FILE = args['gt_file']
 
-FERN_DATA_DIR = "/ssd1/anndata/bigann/"
-AWARE_DATA_DIR = "/ssd1/data/bigann/"
 
-DATA_DIR = FERN_DATA_DIR
+os.environ["PARLAY_NUM_THREADS"] = "2"
 
-# print("!!! FILTERED IVF !!!")
-# fivf = wp.init_filtered_ivf_index("Euclidian", "uint8")
-# fivf.fit_from_filename(DATA_DIR + "data/yfcc100M/base.10M.u8bin.crop_nb_10000000", DATA_DIR + 'data/yfcc100M/base.metadata.10M.spmat', 1000)
-
-# print("----- Querying Filtered IVF Index... -----")
-
-# X = np.fromfile(DATA_DIR + "data/yfcc100M/query.public.100K.u8bin", dtype=np.uint8)[8:].reshape((100_000, 192))
-# filters = [wp.QueryFilter(3432, 3075) for _ in range(50_000)] + [wp.QueryFilter(23) for _ in range(50_000)]
-
-# neighbors, distances = fivf.batch_search(X, filters, 100_000, 10, 100)
-# print(neighbors.shape)
-# print(neighbors[:10, :])
-# print(distances[:10, :])
 
 print("----- Building Squared IVF index... -----")
 
 CUTOFF = 5_000
 CLUSTER_SIZE = 5000
-NQ = 100_000
 WEIGHT_CLASSES = (100_000, 400_000)
 MAX_DEGREES = (8, 10, 12)
 
@@ -92,7 +98,7 @@ if not os.path.exists("index_cache/"):
     os.mkdir("index_cache/")
 
 
-index = wp.init_squared_ivf_index("Euclidian", "uint8")
+index = wp.init_squared_ivf_index("Euclidian", "float")
 
 for i in range(3):
     index.set_build_params(wp.BuildParams(MAX_DEGREES[i], 200, ALPHA), i)
@@ -100,18 +106,21 @@ for i in range(3):
 
 index.set_bitvector_cutoff(10000)
 
-index.fit_from_filename(DATA_DIR + "data/yfcc100M/base.10M.u8bin.crop_nb_10000000", DATA_DIR +
-                        'data/yfcc100M/base.metadata.10M.spmat', CUTOFF, CLUSTER_SIZE, "index_cache/", WEIGHT_CLASSES, True)
+index.fit_from_filename(BASE_DATA, BASE_LABELS, CUTOFF, CLUSTER_SIZE, "index_cache/", WEIGHT_CLASSES, True)
 
 print(f"Time taken: {time.time() - start:.2f}s")
 
 print("----- Querying Squared IVF Index... -----")
 start = time.time()
 
-X = np.fromfile(DATA_DIR + "data/yfcc100M/query.public.100K.u8bin",
-                dtype=np.uint8)[8:].reshape((100_000, 192))
-filters = read_sparse_matrix(
-    DATA_DIR + 'data/yfcc100M/query.metadata.public.100K.spmat')
+
+X = np.fromfile(QUERY_DATA, dtype=np.float32)
+xshape = np.fromfile(QUERY_DATA, dtype=np.uint32)[:2]
+print(f"query shape: {xshape}")
+X = X[2:].reshape((xshape[0], xshape[1]))
+filters = read_sparse_matrix(QUERY_LABELS)
+print("loaded query file and query labels")
+NQ = xshape[0]
 
 rows, cols = filters.nonzero()
 filter_dict = defaultdict(list)
@@ -135,29 +144,10 @@ elapsed = time.time() - start
 
 index.print_stats()
 
-all_filters = wp.csr_filters(
-    DATA_DIR + 'data/yfcc100M/base.metadata.10M.spmat').transpose()
-
-# if NQ <= 10:
-#     print(filters[:NQ])
-
-#     print([(all_filters.point_count(i.a), all_filters.point_count(i.b))
-#           if i.is_and() else all_filters.point_count(i.a) for i in filters[:NQ]])
-# else:
-#     print(filters[:10])
-
-#     print([(all_filters.point_count(i.a), all_filters.point_count(i.b))
-#           if i.is_and() else all_filters.point_count(i.a) for i in filters[:10]])
-
-# print(neighbors.shape)
-# print(neighbors[:10, :])
-# print(distances[:10, :])
+all_filters = wp.csr_filters(BASE_LABELS).transpose()
 
 print(f"Time taken: {elapsed:.2f}s")
 print(f"QPS: {NQ / elapsed:,.2f}")
-
-# Calculate and print average recall for each case
-GROUND_TRUTH_DIR = DATA_DIR + "data/yfcc100M/GT.public.ibin"
 
 
 def retrieve_ground_truth(fname):
@@ -170,7 +160,7 @@ def retrieve_ground_truth(fname):
     return I, D
 
 
-I, D = retrieve_ground_truth(GROUND_TRUTH_DIR)
+I, D = retrieve_ground_truth(GT_FILE)
 print(len(I))
 # print(len(D))
 print(I[:10, :])
@@ -178,7 +168,7 @@ print(I[:10, :])
 total_recall = 0.0
 query_cases = defaultdict(float)
 case_counts = defaultdict(int)
-filters2 = wp.csr_filters(DATA_DIR + 'data/yfcc100M/base.metadata.10M.spmat')
+filters2 = wp.csr_filters(BASE_LABELS)
 filters2.transpose_inplace()
 
 case_comparisons = defaultdict(int)

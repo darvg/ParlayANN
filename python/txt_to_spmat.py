@@ -10,7 +10,7 @@ def build_parser():
                         help='path of input file')
     parser.add_argument('-n', metavar='number of labels', type=int, default=-1,
                         help='total number of labels')
-    parser.add_argument('-o', metavar='out_file', type=int, default=-1,
+    parser.add_argument('-o', metavar='out_file', type=str, default=-1,
                         help='output .spmat file')
 
     return vars(parser.parse_args())
@@ -48,11 +48,12 @@ def write_sparse_matrix(mat, fname):
 if __name__ == "__main__":
     args = build_parser()
     in_fname, num_lbls, out_fname = args['f'], args['n'], args['o']
-    labels, num_unique_lbls = parse_label_file(in_fname)
-    if num_lbls != num_unique_lbls:
-        print(f"Warning: input labels was {num_lbls} while computed num labels was {num_unique_lbls}")
+    labels, unique_lbls = parse_label_file(in_fname)
+    print(len(labels), unique_lbls)
+    if num_lbls != len(unique_lbls):
+        print(f"Warning: input labels was {num_lbls} while computed num labels was {len(unique_lbls)}")
+        print("(Ignore this if you're converting query labels)")
 
-    csr_mat = (labels, num_lbls)
+    csr_mat = setup_csr_mat(labels, num_lbls)
     write_sparse_matrix(csr_mat, out_fname)
     print(f"wrote csr matrix to {out_fname}")
-
