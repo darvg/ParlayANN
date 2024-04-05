@@ -22,6 +22,12 @@ def build_parser():
                         help='query labels in spmat format')
     parser.add_argument('--gt_file', metavar='out_file', type=str,
                         help='gt file in diskann format')
+    parser.add_argument('--tiny_cutoff', metavar='tiny_cutoff', type=int,
+                        help='cutoff for search bruteforce')
+    parser.add_argument('--bitvector_cutoff', metavar='bitvector_cutoff', type=int,
+                        help='cutoff for not using bitvectors?')
+    parser.add_argument('--target_points', metavar='target_points', type=int,
+                        help='target points to use in search')
     return vars(parser.parse_args())
 
 
@@ -78,13 +84,14 @@ os.environ["PARLAY_NUM_THREADS"] = "64"
 
 print("----- Building Squared IVF index... -----")
 
-CUTOFF = 5_000
-CLUSTER_SIZE = 5000
+CUTOFF = 10000
+CLUSTER_SIZE = 10000
 WEIGHT_CLASSES = (100_000, 400_000)
 MAX_DEGREES = (8, 10, 12)
 
-TINY_CUTOFF = 60000
-TARGET_POINTS = 15_000
+TINY_CUTOFF = args['tiny_cutoff']
+BITVECTOR_CUTOFF = args['bitvector_cutoff']
+TARGET_POINTS = args['target_points']
 BEAM_WIDTHS = (85, 85, 85)
 SEARCH_LIMITS = (int(WEIGHT_CLASSES[0] * 0.2), int(WEIGHT_CLASSES[1] * 0.5), int(3_000_000 * 0.5))
 
@@ -104,7 +111,7 @@ for i in range(3):
     index.set_build_params(wp.BuildParams(MAX_DEGREES[i], 200, ALPHA), i)
     index.set_query_params(wp.QueryParams(10, BEAM_WIDTHS[i], 1.35, SEARCH_LIMITS[i], MAX_DEGREES[i]), i)
 
-index.set_bitvector_cutoff(10000)
+index.set_bitvector_cutoff(BITVECTOR_CUTOFF)
 
 index.fit_from_filename(BASE_DATA, BASE_LABELS, CUTOFF, CLUSTER_SIZE, "index_cache/", WEIGHT_CLASSES, True)
 
