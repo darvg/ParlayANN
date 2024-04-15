@@ -8,8 +8,6 @@ def build_parser():
     parser = argparse.ArgumentParser(description="derive statistics for labels in labels file")
     parser.add_argument('-f', metavar='file_name', type=str, default='',
                         help='path of input file')
-    parser.add_argument('-n', metavar='number of labels', type=int, default=-1,
-                        help='total number of labels')
     parser.add_argument('-o', metavar='out_file', type=str, default=-1,
                         help='output .spmat file')
 
@@ -23,17 +21,21 @@ def parse_label_file(fname):
             curr_labels = line.rstrip().split(',')
             if len(curr_labels) == 1:
                 curr_labels = line.rstrip().split('&')
-            curr_labels = [int(label) for label in curr_labels]
+            curr_labels = [int(label) + 1 for label in curr_labels]
             labels.append(curr_labels)
             unique_labels.update(curr_labels)
-    return labels, unique_labels
+    print(unique_labels)
+    return labels, unique_labels, (max(unique_labels) - min(unique_labels) + 1)
 
 def setup_csr_mat(labels, num_total_labels):
-    npspmat = np.zeros((len(labels), num_total_labels))
-    for i in range(len(npspmat)):
+    #npspmat = np.zeros((len(labels), num_total_labels))
+    row_data, col_data, data = [], [], []
+    for i in range(len(labels)):
         for label in labels[i]:
-            npspmat[i][label-1] = 1
-    return csr_matrix(npspmat)
+            row_data.append(i)
+            col_data.append(label - 1)
+            data.append(1)
+    return csr_matrix((data,(row_data,col_data)),shape=(len(labels),num_total_labels))
 
 def write_sparse_matrix(mat, fname):
     """ write a CSR matrix in the spmat format """
@@ -47,9 +49,9 @@ def write_sparse_matrix(mat, fname):
 
 if __name__ == "__main__":
     args = build_parser()
-    in_fname, num_lbls, out_fname = args['f'], args['n'], args['o']
-    labels, unique_lbls = parse_label_file(in_fname)
-    print(len(labels), unique_lbls)
+    in_fname, out_fname = args['f'], args['o']
+    labels, unique_lbls, num_lbls = parse_label_file(in_fname)
+    print(len(labels), max(unique_lbls), min(unique_lbls))
     if num_lbls != len(unique_lbls):
         print(f"Warning: input labels was {num_lbls} while computed num labels was {len(unique_lbls)}")
         print("(Ignore this if you're converting query labels)")
