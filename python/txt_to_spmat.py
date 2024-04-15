@@ -17,13 +17,20 @@ def parse_label_file(fname):
     with open(fname, "r") as fd:
         labels = []
         unique_labels = set()
-        for line in fd:
+        empty_lines = []
+        for i, line in enumerate(fd):
             curr_labels = line.rstrip().split(',')
             if len(curr_labels) == 1:
                 curr_labels = line.rstrip().split('&')
+            if len(curr_labels) == 0:
+                empty_lines.append(i)
+                labels.append(-1)
+                continue
             curr_labels = [int(label) + 1 for label in curr_labels]
             labels.append(curr_labels)
             unique_labels.update(curr_labels)
+        for l in empty_lines:
+            labels[l] = [len(unique_labels) + 1]
     print(unique_labels)
     return labels, unique_labels, (max(unique_labels) - min(unique_labels) + 1)
 
