@@ -28,6 +28,8 @@ def build_parser():
                         help='cutoff for not using bitvectors?')
     parser.add_argument('--target_points', metavar='target_points', type=int,
                         help='target points to use in search')
+    parser.add_argument('--build', default=False, action='store_true',
+                        help='if present, in build mode')
     return vars(parser.parse_args())
 
 
@@ -77,13 +79,18 @@ BASE_LABELS = args['base_labels']
 QUERY_DATA = args['query_data']
 QUERY_LABELS = args['query_labels']
 GT_FILE = args['gt_file']
+BUILD = args['build']
 
-
-os.environ["PARLAY_NUM_THREADS"] = "64"
+if BUILD:
+    os.environ["PARLAY_NUM_THREADS"] = "160"
+else:
+    os.environ["PARLAY_NUM_THREADS"] = "1"
 
 
 print("----- Building Squared IVF index... -----")
 
+# CUTOFF = 10000
+# CLUSTER_SIZE = 10000
 CUTOFF = 10000
 CLUSTER_SIZE = 10000
 WEIGHT_CLASSES = (100_000, 400_000)
