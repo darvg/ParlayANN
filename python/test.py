@@ -112,7 +112,7 @@ if not os.path.exists("index_cache/"):
     os.mkdir("index_cache/")
 
 
-index = wp.init_squared_ivf_index("Euclidian", "float")
+index = wp.init_squared_ivf_index("Euclidian", "uint8")
 
 for i in range(3):
     index.set_build_params(wp.BuildParams(MAX_DEGREES[i], 200, ALPHA), i)
