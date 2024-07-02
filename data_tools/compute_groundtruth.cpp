@@ -7,6 +7,9 @@
 #include "utils/euclidian_point.h"
 #include "utils/mips_point.h"
 #include "utils/point_range.h"
+#include "utils/chamfer_point_range.h"
+#include "utils/chamfer_point.h"
+
 
 
 using pid = std::pair<int, float>;
@@ -105,8 +108,8 @@ int main(int argc, char* argv[]) {
   int k = P.getOptionIntValue("-k", 100);
 
   std::string df = std::string(dfc);
-  if(df != "Euclidian" && df != "mips"){
-    std::cout << "Error: invalid distance type: specify Euclidian or mips" << std::endl;
+  if(df != "Euclidian" && df != "mips" && df != "chamfer"){
+    std::cout << "Error: invalid distance type: specify Euclidian, mips or chamfer" << std::endl;
     abort();
   }
 
@@ -135,6 +138,10 @@ int main(int argc, char* argv[]) {
       PointRange<float, Mips_Point<float>> B = PointRange<float, Mips_Point<float>>(bFile);
       PointRange<float, Mips_Point<float>> Q = PointRange<float, Mips_Point<float>>(qFile);
       answers = compute_groundtruth<PointRange<float, Mips_Point<float>>>(B, Q, k);
+    } else if(df == "chamfer"){
+      auto B = ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(bFile);
+      auto Q = ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(qFile);
+      answers = compute_groundtruth<ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>>(B, Q, k);
     }
   }else if(tp == "uint8"){
     std::cout << "Detected uint8 coordinates" << std::endl;
@@ -146,6 +153,10 @@ int main(int argc, char* argv[]) {
       PointRange<uint8_t, Mips_Point<uint8_t>> B = PointRange<uint8_t, Mips_Point<uint8_t>>(bFile);
       PointRange<uint8_t, Mips_Point<uint8_t>> Q = PointRange<uint8_t, Mips_Point<uint8_t>>(qFile);
       answers = compute_groundtruth<PointRange<uint8_t, Mips_Point<uint8_t>>>(B, Q, k);
+    } else if(df == "chamfer"){
+      auto B = ChamferPointRange<uint8_t, Chamfer_Point<Euclidian_Point<uint8_t>>>(bFile);
+      auto Q = ChamferPointRange<uint8_t, Chamfer_Point<Euclidian_Point<uint8_t>>>(qFile);
+      answers = compute_groundtruth<ChamferPointRange<uint8_t, Chamfer_Point<Euclidian_Point<uint8_t>>>(B, Q, k);
     }
   }else if(tp == "int8"){
     std::cout << "Detected int8 coordinates" << std::endl;
@@ -157,6 +168,10 @@ int main(int argc, char* argv[]) {
       PointRange<int8_t, Mips_Point<int8_t>> B = PointRange<int8_t, Mips_Point<int8_t>>(bFile);
       PointRange<int8_t, Mips_Point<int8_t>> Q = PointRange<int8_t, Mips_Point<int8_t>>(qFile);
       answers = compute_groundtruth<PointRange<int8_t, Mips_Point<int8_t>>>(B, Q, k);
+    } else if(df == "chamfer"){
+      auto B = ChamferPointRange<int8_t, Chamfer_Point<Euclidian_Point<int8_t>>>(bFile);
+      auto Q = ChamferPointRange<int8_t, Chamfer_Point<Euclidian_Point<int8_t>>>(qFile);
+      answers = compute_groundtruth<ChamferPointRange<int8_t, Chamfer_Point<Euclidian_Point<int8_t>>>(B, Q, k);
     }
   }
   write_ibin(answers, std::string(gFile), k);

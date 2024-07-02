@@ -111,7 +111,7 @@ template <typename T_, class Point_> struct ChamferPointRange {
     }
     int num_vectors = prefix_sums[i + 1] - prefix_sums[i];
     return Point(values.get() + prefix_sums[i] * dims, i,
-                 Point::parameters(dims, num_vectors));
+                 typename ChamferPointRange<T_, Point_>::Point::parameters(dims, num_vectors));
   }
 
   parameters params;
