@@ -70,7 +70,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
               << std::endl;
 
     prefix_sums = std::make_shared<unsigned int[]>(num_points + 1);
-    reader.read((char *)(&prefix_sums),
+    prefix_sums[0] = 0;
+    reader.read((char *)(&prefix_sums[1]),
                 sizeof(unsigned int) * (num_points + 1));
 
     long num_bytes = n * dims * sizeof(T) * prefix_sums[num_points];
@@ -111,7 +112,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
     }
     int num_vectors = prefix_sums[i + 1] - prefix_sums[i];
     return Point(values.get() + prefix_sums[i] * dims, i,
-                 typename ChamferPointRange<T_, Point_>::Point::parameters(dims, num_vectors));
+                 typename ChamferPointRange<T_, Point_>::Point::parameters(
+                     dims, num_vectors));
   }
 
   parameters params;

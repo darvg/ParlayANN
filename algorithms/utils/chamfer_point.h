@@ -16,10 +16,14 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <type_traits>
 #include <unistd.h>
 
-template <class Point> struct Chamfer_Point {
-  using T = decltype(Point::val);
+template <class Point_> struct Chamfer_Point {
+
+  // static_assert(!std::is_floating_point<Point_>::value,
+  // "Float types are NOT allowed here!");
+  using T = decltype(Point_::val);
   using distanceType = float;
   // template<typename C, typename range> friend struct Quantized_Mips_Point;
 
@@ -36,7 +40,7 @@ template <class Point> struct Chamfer_Point {
   static bool is_metric() { return false; }
   T operator[](long i) const { return *(values + i); }
 
-  float distance(const Chamfer_Point<Point> &x) const {
+  float distance(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
@@ -69,7 +73,7 @@ template <class Point> struct Chamfer_Point {
   Chamfer_Point(T *values, long id, parameters params)
       : values(values), id_(id), params(params) {}
 
-  bool operator==(const Chamfer_Point<T> &q) const {
+  bool operator==(const Chamfer_Point<Point_> &q) const {
     if (q.params.num_vectors != params.num_vectors) {
       return false;
     }
@@ -81,7 +85,9 @@ template <class Point> struct Chamfer_Point {
     return true;
   }
 
-  bool same_as(const Chamfer_Point<T> &q) const { return values == q.values; }
+  bool same_as(const Chamfer_Point<Point_> &q) const {
+    return values == q.values;
+  }
 
   void normalize() {
     double norm = 0.0;
@@ -94,7 +100,7 @@ template <class Point> struct Chamfer_Point {
       values[j] = values[j] / norm;
   }
 
-  static void translate_point(T *values, const Point &p,
+  static void translate_point(T *values, const Point_ &p,
                               const parameters &params) {
     for (int j = 0; j < params.dims; j++)
       values[j] = (T)p[j];
