@@ -30,7 +30,7 @@ template <class Point_> struct Chamfer_Point {
   struct parameters {
     int dims;
     int num_vectors;
-    parameters() : dims(0), num_vectors(0) { throw; }
+    parameters() : dims(0), num_vectors(0) {}
     parameters(int dims) : dims(dims), num_vectors(1) {}
     parameters(int dims, int num_vectors)
         : dims(dims), num_vectors(num_vectors) {}

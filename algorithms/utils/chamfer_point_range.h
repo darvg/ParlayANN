@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <sys/mman.h>
 
 #include "../bench/parse_command_line.h"
@@ -59,26 +60,71 @@ template <typename T_, class Point_> struct ChamferPointRange {
     assert(reader.is_open());
 
     // read num points and max degree
-    unsigned int num_points;
-    unsigned int d;
-    reader.read((char *)(&num_points), sizeof(unsigned int));
+    uint32_t num_points;
+    uint32_t d;
+    reader.read((char *)(&num_points), sizeof(uint32_t));
     n = num_points;
-    reader.read((char *)(&d), sizeof(unsigned int));
+    reader.read((char *)(&d), sizeof(uint32_t));
     dims = d;
     params = parameters(d);
     std::cout << "Detected " << num_points << " points with dimension " << d
               << std::endl;
 
-    prefix_sums = std::make_shared<unsigned int[]>(num_points + 1);
-    prefix_sums[0] = 0;
-    reader.read((char *)(&prefix_sums[1]),
-                sizeof(unsigned int) * (num_points + 1));
+    prefix_sums = std::shared_ptr<uint32_t[]>(new uint32_t[num_points + 1], std::default_delete<uint32_t[]>());
 
-    long num_bytes = n * dims * sizeof(T) * prefix_sums[num_points];
+    std::vector<uint32_t> prefix_sums_vec(num_points + 1);
+
+    assert(num_points == 500000);
+
+    // confirm the alloc worked
+    if (prefix_sums == nullptr) {
+      std::cout << "ERROR: could not allocate memory for prefix sums"
+                << std::endl;
+      abort();
+    }
+
+    prefix_sums[0] = 0;
+
+    volatile int tmp2;
+    // std::cout << "reader position: " << reader.tellg() << std::endl;
+
+    size_t reader_position = reader.tellg();
+    // reader.seekg(0, std::ios::end);
+
+    // std::cout << "reader end position: " << reader.tellg() << std::endl;
+
+    // reader.seekg(reader_position); 
+
+    // read prefix sums
+    for (int i = 0; i < num_points; i++) {
+      // reader.read((char *)(prefix_sums.get() + i + 1), sizeof(uint32_t));
+      // separate the read and write for debug
+      uint32_t tmp;
+
+      reader_position = reader.tellg();
+
+      reader.read((char *)(&tmp), sizeof(uint32_t));
+
+      prefix_sums_vec[i + 1] = tmp;
+
+      // if (reader.tellg() > 500000 ){
+      //   std::cout << "prev reader position: " << reader_position << std::endl;
+      // }
+      // tmp2 = tmp;
+      // prefix_sums[i + 1] = tmp;
+    }
+    // std::cout << "Reader state: " << reader.rdstate() << std::endl;
+
+    // reader.read(reinterpret_cast<char*>(prefix_sums.get() + 1),
+    //             sizeof(uint32_t) * (num_points));
+
+    memcpy(prefix_sums.get(), prefix_sums_vec.data(), sizeof(uint32_t) * (num_points + 1));
+
+    long num_bytes = dims * sizeof(T) * prefix_sums[num_points];
     T *ptr = (T *)malloc(num_bytes);
-    madvise(ptr, num_bytes, MADV_HUGEPAGE);
-    values = std::shared_ptr<T[]>(ptr, std::free);
-    reader.read((char *)(&values), sizeof(T) * (num_bytes));
+    // madvise(ptr, num_bytes, MADV_HUGEPAGE);
+    values = std::shared_ptr<T[]>(ptr, std::default_delete<T[]>());
+    reader.read((char *)(values.get()), num_bytes);
     // size_t BLOCK_SIZE = 1000000;
     // size_t index = 0;
     // while (index < n) {
@@ -102,7 +148,7 @@ template <typename T_, class Point_> struct ChamferPointRange {
 
   size_t size() const { return n; }
 
-  unsigned int get_dims() const { return dims; }
+  uint32_t get_dims() const { return dims; }
 
   Point operator[](long i) const {
     if (i > n) {
@@ -120,7 +166,7 @@ template <typename T_, class Point_> struct ChamferPointRange {
 
 private:
   std::shared_ptr<T[]> values;
-  std::shared_ptr<unsigned int[]> prefix_sums;
-  unsigned int dims;
+  std::shared_ptr<uint32_t[]> prefix_sums;
+  uint32_t dims;
   size_t n;
 };
