@@ -63,10 +63,10 @@ compute_groundtruth(PointRange &B, PointRange &Q, int k) {
     
     if (d(gen)) {
       unsigned int current = progress.fetch_add(1) * 160;
-      float frac_progress = (float)current / q;
+      float frac_progress = ((float)current) / q;
       double elapsed = t.total_time();
       double projected_time = elapsed / frac_progress;
-      std::cout << "Progress: ~" << current << "/" << q << " (" << frac_progress << "%) ["
+      std::cout << "Progress: ~" << current << "/" << q << " (" << frac_progress * 100 << "%) ["
           << std::setfill('0') << std::setw(2) << std::floor(elapsed / 3600) << ":"
           << std::setw(2) << std::floor((int)elapsed % 3600 / 60) << ":"
           << std::setw(2) << (int)elapsed % 60 << "/"
