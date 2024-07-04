@@ -3,12 +3,18 @@
 #include "parlay/primitives.h"
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
+#include <atomic>
+#include <random>
+#include <locale>
+#include <chrono>
 // #include "utils/types.h"
 #include "utils/chamfer_point.h"
 #include "utils/chamfer_point_range.h"
 #include "utils/euclidian_point.h"
 #include "utils/mips_point.h"
 #include "utils/point_range.h"
+#include "parlay/internal/get_time.h"
 
 using pid = std::pair<int, float>;
 
@@ -18,6 +24,11 @@ compute_groundtruth(PointRange &B, PointRange &Q, int k) {
   unsigned d = B.dimension();
   size_t q = Q.size();
   size_t b = B.size();
+
+  auto progress = std::atomic<unsigned int>(0);
+  parlay::internal::timer t;
+  t.start();
+
   auto answers = parlay::tabulate(q, [&](size_t i) {
     float topdist = B[0].d_min();
     int toppos;
@@ -46,6 +57,24 @@ compute_groundtruth(PointRange &B, PointRange &Q, int k) {
         toppos = new_toppos;
       }
     }
+
+    std::mt19937 gen(i);
+    std::bernoulli_distribution d(1. / 160.);
+    
+    if (d(gen)) {
+      unsigned int current = progress.fetch_add(1) * 160;
+      float frac_progress = (float)current / q;
+      double elapsed = t.total_time();
+      double projected_time = elapsed / frac_progress;
+      std::cout << "Progress: ~" << current << "/" << q << " (" << frac_progress << "%) ["
+          << std::setfill('0') << std::setw(2) << std::floor(elapsed / 3600) << ":"
+          << std::setw(2) << std::floor((int)elapsed % 3600 / 60) << ":"
+          << std::setw(2) << (int)elapsed % 60 << "/"
+          << std::setw(2) << std::floor(projected_time / 3600) << ":"
+          << std::setw(2) << std::floor((int)projected_time % 3600 / 60) << ":"
+          << std::setw(2) << (int)projected_time % 60 << "]" << std::endl;
+    }
+
     return topk;
   });
   std::cout << "Done computing groundtruth" << std::endl;
@@ -94,6 +123,10 @@ void write_ibin(parlay::sequence<parlay::sequence<pid>> &result,
 }
 
 int main(int argc, char *argv[]) {
+  // setting locale for number formatting
+  std::locale::global(std::locale("en_US.utf8"));
+  std::cout.imbue(std::locale());
+
   commandLine P(
       argc, argv,
       "[-base_path <b>] [-query_path <q>] "
