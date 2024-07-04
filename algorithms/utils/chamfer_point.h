@@ -36,7 +36,7 @@ template <class Point_> struct Chamfer_Point {
         : dims(dims), num_vectors(num_vectors) {}
   };
 
-  static distanceType d_min() { return -std::numeric_limits<float>::max(); }
+  static distanceType d_min() { return Point_::d_min(); }
   static bool is_metric() { return false; }
   T operator[](long i) const { return *(values + i); }
 
