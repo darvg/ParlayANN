@@ -39,7 +39,7 @@ template <class Point_> struct Chamfer_Point {
 
   static distanceType d_min() { return Point_::d_min(); }
   static bool is_metric() { return false; }
-  T operator[](long i) const { return *(values + i); }
+  T operator[](long i) const { return *(values + i); } // I feel like this should probably return the ith vector
 
   float distance(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
