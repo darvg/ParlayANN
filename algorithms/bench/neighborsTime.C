@@ -48,7 +48,6 @@ template <typename Point, typename PointRange, typename indexType>
 void timeNeighbors(Graph<indexType> &G, PointRange &Query_Points, long k,
                    BuildParams &BP, char *outFile, groundTruth<indexType> GT,
                    char *res_file, bool graph_built, PointRange &Points) {
-
   time_loop(
       1, 0, [&]() {},
       [&]() {
@@ -134,7 +133,7 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  if (df != "Euclidian" && df != "mips") {
+  if (df != "Euclidian" && df != "mips" && df != "chamfer") {
     std::cout << "Error: specify distance type Euclidian or mips" << std::endl;
     abort();
   }
@@ -226,21 +225,18 @@ int main(int argc, char *argv[]) {
                                        graph_built, Points);
       }
     } else if (df == "chamfer") {
-      ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>> Points =
-          ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(
-              iFile);
-      ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>
-          Query_Points =
-              ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(
-                  qFile);
+      ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>> Points =
+          ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>(iFile);
+      ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>> Query_Points =
+          ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>(qFile);
       Graph<unsigned int> G;
       if (gFile == NULL)
         G = Graph<unsigned int>(maxDeg, Points.size());
       else
         G = Graph<unsigned int>(gFile);
-      using Point = Chamfer_Point<Euclidian_Point<float>>;
+      using Point = Chamfer_Point<Mips_Point<float>>;
       using PR = ChamferPointRange<float, Point>;
-      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
+      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, oFile,
                                      graph_built, Points);
     }
   } else if (tp == "uint8") {

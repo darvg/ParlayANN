@@ -1,8 +1,8 @@
 #pragma once
 
 #include <algorithm>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sys/mman.h>
 
 #include "../bench/parse_command_line.h"
@@ -59,6 +59,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
     std::ifstream reader(filename);
     assert(reader.is_open());
 
+    std::cout << "setting up" << std::endl;
+
     // read num points and max degree
     uint32_t num_points;
     uint32_t d;
@@ -70,7 +72,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
     std::cout << "Detected " << num_points << " points with dimension " << d
               << std::endl;
 
-    prefix_sums = std::shared_ptr<uint32_t[]>(new uint32_t[num_points + 1], std::default_delete<uint32_t[]>());
+    prefix_sums = std::shared_ptr<uint32_t[]>(
+        new uint32_t[num_points + 1], std::default_delete<uint32_t[]>());
 
     std::vector<uint32_t> prefix_sums_vec(num_points + 1);
 
@@ -93,7 +96,7 @@ template <typename T_, class Point_> struct ChamferPointRange {
 
     // std::cout << "reader end position: " << reader.tellg() << std::endl;
 
-    // reader.seekg(reader_position); 
+    // reader.seekg(reader_position);
 
     // read prefix sums
     for (int i = 0; i < num_points; i++) {
@@ -108,7 +111,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
       prefix_sums_vec[i + 1] = tmp;
 
       // if (reader.tellg() > 500000 ){
-      //   std::cout << "prev reader position: " << reader_position << std::endl;
+      //   std::cout << "prev reader position: " << reader_position <<
+      //   std::endl;
       // }
       // tmp2 = tmp;
       // prefix_sums[i + 1] = tmp;
@@ -118,7 +122,8 @@ template <typename T_, class Point_> struct ChamferPointRange {
     // reader.read(reinterpret_cast<char*>(prefix_sums.get() + 1),
     //             sizeof(uint32_t) * (num_points));
 
-    memcpy(prefix_sums.get(), prefix_sums_vec.data(), sizeof(uint32_t) * (num_points + 1));
+    memcpy(prefix_sums.get(), prefix_sums_vec.data(),
+           sizeof(uint32_t) * (num_points + 1));
 
     long num_bytes = dims * sizeof(T) * prefix_sums[num_points];
     T *ptr = (T *)malloc(num_bytes);
@@ -157,9 +162,10 @@ template <typename T_, class Point_> struct ChamferPointRange {
       abort();
     }
     int num_vectors = prefix_sums[i + 1] - prefix_sums[i];
-    return Point(values.get() + prefix_sums[i] * dims, i,
-                 typename ChamferPointRange<T_, Point_>::Point::parameters(
-                     dims, num_vectors));
+    auto x = Point(values.get() + prefix_sums[i] * dims, i,
+                   typename ChamferPointRange<T_, Point_>::Point::parameters(
+                       dims, num_vectors));
+    return x;
   }
 
   parameters params;

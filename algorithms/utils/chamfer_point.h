@@ -6,6 +6,7 @@
 #include "../bench/parse_command_line.h"
 #include "NSGDist.h"
 #include "euclidian_point.h"
+#include "mips_point.h"
 #include "parlay/internal/file_map.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
@@ -51,8 +52,13 @@ template <class Point_> struct Chamfer_Point {
       float curr_min = std::numeric_limits<float>::infinity();
       for (int j = 0; j < x_num_vecs; j++) {
         T *x_vec = x.values + j * curr_dim;
-        curr_min =
-            std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
+        if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
+          curr_min =
+              std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
+        } else {
+          curr_min =
+              std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
+        }
       }
       return_dist += curr_min;
     }

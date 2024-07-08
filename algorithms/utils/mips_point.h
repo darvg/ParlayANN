@@ -126,6 +126,8 @@ template <typename T> struct Mips_Point {
     return parameters(pr.dimension());
   }
 
+  T val;
+
 private:
   T *values;
   long id_;
