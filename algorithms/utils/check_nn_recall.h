@@ -100,13 +100,18 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
       std::set<int> reported_nbhs;
       for (indexType l = 0; l < k; l++)
         reported_nbhs.insert((all_ngh[i])[l]);
-      for (indexType l = 0; l < results_with_ties.size(); l++) {
-        if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end()) {
-          numCorrect += 1;
-        }
+      // for (indexType l = 0; l < results_with_ties.size(); l++) {
+      //   if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
+      //   {
+      //     numCorrect += 1;
+      //   }
+      // }
+      if (reported_nbhs.find(results_with_ties[0]) != reported_nbhs.end()) {
+        numCorrect += 1;
       }
     }
-    recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
+    // recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
+    recall = static_cast<float>(numCorrect) / static_cast<float>(1 * n);
   }
   float QPS = Query_Points.size() / query_time;
   if (verbose)
