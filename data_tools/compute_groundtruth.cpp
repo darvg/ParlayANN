@@ -120,6 +120,8 @@ void write_ibin(parlay::sequence<parlay::sequence<pid>> &result,
   writer.write((char *)id_data, n * k * sizeof(int));
   writer.write((char *)dist_data, n * k * sizeof(float));
   writer.close();
+
+  std::cout << "Done writing groundtruth to" << outFile << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -180,12 +182,12 @@ int main(int argc, char *argv[]) {
       answers =
           compute_groundtruth<PointRange<float, Mips_Point<float>>>(B, Q, k);
     } else if (df == "chamfer") {
-      auto B = ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(
+      auto B = ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>(
           bFile);
-      auto Q = ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>(
+      auto Q = ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>(
           qFile);
       answers = compute_groundtruth<
-          ChamferPointRange<float, Chamfer_Point<Euclidian_Point<float>>>>(B, Q,
+          ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>>(B, Q,
                                                                            k);
     }
   }
