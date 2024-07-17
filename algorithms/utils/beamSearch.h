@@ -113,7 +113,7 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
   frontier.reserve(QP.beamSize);
   for (auto q : starting_points)
     frontier.push_back(
-        std::pair<indexType, distanceType>(q, Points[q].distance(p)));
+        std::pair<indexType, distanceType>(q, p.distance(Points[q])));
   std::sort(frontier.begin(), frontier.end(), less);
 
   // The subset of the frontier that has not been visited
@@ -174,7 +174,7 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
                                ? (distanceType)std::numeric_limits<int>::max()
                                : frontier[frontier.size() - 1].second);
     for (auto a : keep) {
-      distanceType dist = Points[a].distance(p);
+      distanceType dist = p.distance(Points[a]);
       dist_cmps++;
       // skip if frontier not full and distance too large
       if (dist >= cutoff)

@@ -39,14 +39,16 @@ template <class Point_> struct Chamfer_Point {
 
   static distanceType d_min() { return Point_::d_min(); }
   static bool is_metric() { return false; }
-  T operator[](long i) const { return *(values + i); } // I feel like this should probably return the ith vector
+  T operator[](long i) const {
+    return *(values + i);
+  } // I feel like this should probably return the ith vector
 
   float distance(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
-    float return_dist = 0.;
+    float return_dist1 = 0.;
     for (int i = 0; i < curr_num_vecs; i++) {
       T *curr_vec = values + i * curr_dim;
       float curr_min = std::numeric_limits<float>::infinity();
@@ -60,10 +62,29 @@ template <class Point_> struct Chamfer_Point {
               std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
         }
       }
-      return_dist += curr_min;
+      return_dist1 += curr_min;
     }
 
-    return return_dist;
+    // float return_dist2 = 0;
+    // for (int i = 0; i < x_num_vecs; i++) {
+    //   T *x_vec = x.values + i * curr_dim;
+    //   float curr_min = std::numeric_limits<float>::infinity();
+    //   for (int j = 0; j < curr_num_vecs; j++) {
+    //     T *curr_vec = values + j * curr_dim;
+    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
+    //       curr_min =
+    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
+    //     } else {
+    //       curr_min =
+    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec,
+    //           curr_dim));
+    //     }
+    //   }
+    //   return_dist2 += curr_min;
+    // }
+    //
+    // return (return_dist1 + return_dist2) / 2;
+    return return_dist1;
   }
 
   void prefetch() const {

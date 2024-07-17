@@ -29,18 +29,16 @@
 #include <set>
 
 #include "../utils/NSGDist.h"
-#include "../utils/point_range.h"
+#include "../utils/beamSearch.h"
 #include "../utils/graph.h"
+#include "../utils/point_range.h"
 #include "../utils/types.h"
+#include "parlay/delayed.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
-#include "parlay/delayed.h"
 #include "parlay/random.h"
-#include "../utils/beamSearch.h"
 
-
-template<typename PointRange, typename indexType>
-struct knn_index {
+template <typename PointRange, typename indexType> struct knn_index {
   using Point = typename PointRange::Point;
   using distanceType = typename Point::distanceType;
   using pid = std::pair<indexType, distanceType>;
@@ -55,22 +53,24 @@ struct knn_index {
 
   indexType get_start() { return start_point; }
 
-  //robustPrune routine as found in DiskANN paper, with the exception
-  //that the new candidate set is added to the field new_nbhs instead
-  //of directly replacing the out_nbh of p
+  // robustPrune routine as found in DiskANN paper, with the exception
+  // that the new candidate set is added to the field new_nbhs instead
+  // of directly replacing the out_nbh of p
   std::pair<parlay::sequence<indexType>, long>
-  robustPrune(indexType p, parlay::sequence<pid>& cand,
-              GraphI &G, PR &Points, double alpha, bool add = true) {
+  robustPrune(indexType p, parlay::sequence<pid> &cand, GraphI &G, PR &Points,
+              double alpha, bool add = true) {
     // add out neighbors of p to the candidate set.
     size_t out_size = G[p].size();
     std::vector<pid> candidates;
     long distance_comps = 0;
-    for (auto x : cand) candidates.push_back(x);
+    for (auto x : cand)
+      candidates.push_back(x);
 
-    if(add){
-      for (size_t i=0; i<out_size; i++) {
+    if (add) {
+      for (size_t i = 0; i < out_size; i++) {
         distance_comps++;
-        candidates.push_back(std::make_pair(G[p][i], Points[G[p][i]].distance(Points[p])));
+        candidates.push_back(
+            std::make_pair(G[p][i], Points[p].distance(Points[G[p][i]])));
       }
     }
 
@@ -79,8 +79,9 @@ struct knn_index {
     std::sort(candidates.begin(), candidates.end(), less);
 
     // remove any duplicates
-    auto new_end =std::unique(candidates.begin(), candidates.end(),
-			      [&] (auto x, auto y) {return x.first == y.first;});
+    auto new_end =
+        std::unique(candidates.begin(), candidates.end(),
+                    [&](auto x, auto y) { return x.first == y.first; });
     candidates = std::vector(candidates.begin(), new_end);
 
     std::vector<indexType> new_nbhs;
@@ -102,7 +103,8 @@ struct knn_index {
         int p_prime = candidates[i].first;
         if (p_prime != -1) {
           distance_comps++;
-          distanceType dist_starprime = Points[p_star].distance(Points[p_prime]);
+          distanceType dist_starprime =
+              Points[p_star].distance(Points[p_prime]);
           distanceType dist_pprime = candidates[i].second;
           if (alpha * dist_starprime <= dist_pprime) {
             candidates[i].first = -1;
@@ -115,48 +117,54 @@ struct knn_index {
     return std::pair(new_neighbors_seq, distance_comps);
   }
 
-  //wrapper to allow calling robustPrune on a sequence of candidates
-  //that do not come with precomputed distances
+  // wrapper to allow calling robustPrune on a sequence of candidates
+  // that do not come with precomputed distances
   std::pair<parlay::sequence<indexType>, long>
-  robustPrune(indexType p, parlay::sequence<indexType> candidates,
-              GraphI &G, PR &Points, double alpha, bool add = true){
+  robustPrune(indexType p, parlay::sequence<indexType> candidates, GraphI &G,
+              PR &Points, double alpha, bool add = true) {
 
     parlay::sequence<pid> cc;
     long distance_comps = 0;
     cc.reserve(candidates.size()); // + size_of(p->out_nbh));
-    for (size_t i=0; i<candidates.size(); ++i) {
+    for (size_t i = 0; i < candidates.size(); ++i) {
       distance_comps++;
-      cc.push_back(std::make_pair(candidates[i], Points[candidates[i]].distance(Points[p])));
+      cc.push_back(std::make_pair(candidates[i],
+                                  Points[p].distance(Points[candidates[i]])));
     }
     auto [ngh_seq, dc] = robustPrune(p, cc, G, Points, alpha, add);
     return std::pair(ngh_seq, dc + distance_comps);
   }
 
   // add ngh to candidates without adding any repeats
-  template<typename rangeType1, typename rangeType2>
-  void add_neighbors_without_repeats(const rangeType1 &ngh, rangeType2& candidates) {
+  template <typename rangeType1, typename rangeType2>
+  void add_neighbors_without_repeats(const rangeType1 &ngh,
+                                     rangeType2 &candidates) {
     std::unordered_set<indexType> a;
-    for (auto c : candidates) a.insert(c);
-    for (int i=0; i < ngh.size(); i++)
-      if (a.count(ngh[i]) == 0) candidates.push_back(ngh[i]);
+    for (auto c : candidates)
+      a.insert(c);
+    for (int i = 0; i < ngh.size(); i++)
+      if (a.count(ngh[i]) == 0)
+        candidates.push_back(ngh[i]);
   }
 
-  void set_start(){start_point = 0;}
+  void set_start() { start_point = 0; }
 
-  void build_index(GraphI &G, PR &Points, stats<indexType> &BuildStats, bool sort_neighbors = true){
+  void build_index(GraphI &G, PR &Points, stats<indexType> &BuildStats,
+                   bool sort_neighbors = true) {
     std::cout << "Building graph..." << std::endl;
     set_start();
-    parlay::sequence<indexType> inserts = parlay::tabulate(Points.size(), [&] (size_t i){
-					    return static_cast<indexType>(i);});
+    parlay::sequence<indexType> inserts = parlay::tabulate(
+        Points.size(), [&](size_t i) { return static_cast<indexType>(i); });
     if (BP.single_batch != 0) {
       int degree = BP.single_batch;
-      std::cout << "Using single batch per round with " << degree << " random start edges" << std::endl;
+      std::cout << "Using single batch per round with " << degree
+                << " random start edges" << std::endl;
       parlay::random_generator gen;
       std::uniform_int_distribution<long> dis(0, G.size());
-      parlay::parallel_for(0, G.size(), [&] (long i) {
+      parlay::parallel_for(0, G.size(), [&](long i) {
         std::vector<indexType> outEdges(degree);
         for (int j = 0; j < degree; j++) {
-          auto r = gen[i*degree + j];
+          auto r = gen[i * degree + j];
           outEdges[j] = dis(r);
         }
         G[i].update_neighbors(outEdges);
@@ -165,7 +173,7 @@ struct knn_index {
 
     // last pass uses alpha
     std::cout << "number of passes = " << BP.num_passes << std::endl;
-    for (int i=0; i < BP.num_passes; i++) {
+    for (int i = 0; i < BP.num_passes; i++) {
       if (i == BP.num_passes - 1)
         batch_insert(inserts, G, Points, BuildStats, BP.alpha, true, 2, .02);
       else
@@ -173,21 +181,23 @@ struct knn_index {
     }
 
     if (sort_neighbors) {
-      parlay::parallel_for (0, G.size(), [&] (long i) {
-        auto less = [&] (indexType j, indexType k) {
-                      return Points[i].distance(Points[j]) < Points[i].distance(Points[k]);};
-        G[i].sort(less);});
+      parlay::parallel_for(0, G.size(), [&](long i) {
+        auto less = [&](indexType j, indexType k) {
+          return Points[i].distance(Points[j]) < Points[i].distance(Points[k]);
+        };
+        G[i].sort(less);
+      });
     }
   }
 
-  void batch_insert(parlay::sequence<indexType> &inserts,
-                    GraphI &G, PR &Points, stats<indexType> &BuildStats, double alpha,
+  void batch_insert(parlay::sequence<indexType> &inserts, GraphI &G, PR &Points,
+                    stats<indexType> &BuildStats, double alpha,
                     bool random_order = false, double base = 2,
-                    double max_fraction = .02, bool print=true) {
-    for(int p : inserts){
-      if(p < 0 || p > (int) G.size()){
-        std::cout << "ERROR: invalid point "
-                  << p << " given to batch_insert" << std::endl;
+                    double max_fraction = .02, bool print = true) {
+    for (int p : inserts) {
+      if (p < 0 || p > (int)G.size()) {
+        std::cout << "ERROR: invalid point " << p << " given to batch_insert"
+                  << std::endl;
         abort();
       }
     }
@@ -199,8 +209,9 @@ struct knn_index {
     float progress_inc = .1;
     size_t max_batch_size = std::min(
         static_cast<size_t>(max_fraction * static_cast<float>(n)), 1000000ul);
-    //fix bug where max batch size could be set to zero
-    if(max_batch_size == 0) max_batch_size = n;
+    // fix bug where max batch size could be set to zero
+    if (max_batch_size == 0)
+      max_batch_size = n;
     parlay::sequence<int> rperm;
     if (random_order)
       rperm = parlay::random_permutation<int>(static_cast<int>(m));
@@ -232,8 +243,8 @@ struct knn_index {
         ceiling = m;
         count = m;
       }
-      
-      parlay::sequence<parlay::sequence<indexType>> new_out_(ceiling-floor);
+
+      parlay::sequence<parlay::sequence<indexType>> new_out_(ceiling - floor);
       // search for each node starting from the start_point, then call
       // robustPrune with the visited list as its candidate set
       t_beam.start();
@@ -241,15 +252,18 @@ struct knn_index {
       parlay::parallel_for(floor, ceiling, [&](size_t i) {
         size_t index = shuffled_inserts[i];
         int sp = BP.single_batch ? i : start_point;
-        QueryParams QP((long) 0, BP.L, (double) 0.0, (long) Points.size(), (long) G.max_degree());
+        QueryParams QP((long)0, BP.L, (double)0.0, (long)Points.size(),
+                       (long)G.max_degree());
         auto [beam_visited, bs_distance_comps] =
-          beam_search<Point, PointRange, indexType>(Points[index], G, Points, sp, QP);
+            beam_search<Point, PointRange, indexType>(Points[index], G, Points,
+                                                      sp, QP);
         auto [beam, visited] = beam_visited;
         BuildStats.increment_dist(index, bs_distance_comps);
         BuildStats.increment_visited(index, visited.size());
 
         long rp_distance_comps;
-        std::tie(new_out_[i-floor], rp_distance_comps) = robustPrune(index, visited, G, Points, alpha);
+        std::tie(new_out_[i - floor], rp_distance_comps) =
+            robustPrune(index, visited, G, Points, alpha);
         BuildStats.increment_dist(index, rp_distance_comps);
       });
       t_beam.stop();
@@ -258,14 +272,18 @@ struct knn_index {
       //(i,j) to a sequence, then semisorting the sequence by key values
       t_bidirect.start();
 
-      auto flattened = parlay::delayed::flatten(parlay::tabulate(ceiling - floor, [&](size_t i) {
-        indexType index = shuffled_inserts[i + floor];
-        return parlay::delayed::map(new_out_[i], [=] (indexType ngh) {
-                                      return std::pair(ngh, index);});}));
-      auto grouped_by = parlay::group_by_key(parlay::delayed::to_sequence(flattened));
+      auto flattened = parlay::delayed::flatten(
+          parlay::tabulate(ceiling - floor, [&](size_t i) {
+            indexType index = shuffled_inserts[i + floor];
+            return parlay::delayed::map(new_out_[i], [=](indexType ngh) {
+              return std::pair(ngh, index);
+            });
+          }));
+      auto grouped_by =
+          parlay::group_by_key(parlay::delayed::to_sequence(flattened));
 
       parlay::parallel_for(floor, ceiling, [&](size_t i) {
-         G[shuffled_inserts[i]].update_neighbors(new_out_[i-floor]);
+        G[shuffled_inserts[i]].update_neighbors(new_out_[i - floor]);
       });
 
       t_bidirect.stop();
@@ -275,13 +293,14 @@ struct knn_index {
       // otherwise, use robustPrune on the vertex with user-specified alpha
       parlay::parallel_for(0, grouped_by.size(), [&](size_t j) {
         auto &[index, candidates] = grouped_by[j];
-	size_t newsize = candidates.size() + G[index].size();
+        size_t newsize = candidates.size() + G[index].size();
         if (newsize <= BP.R) {
-	  add_neighbors_without_repeats(G[index], candidates);
-	  G[index].update_neighbors(candidates);
+          add_neighbors_without_repeats(G[index], candidates);
+          G[index].update_neighbors(candidates);
         } else {
-          auto [new_out_2_, distance_comps] = robustPrune(index, std::move(candidates), G, Points, alpha);
-	  G[index].update_neighbors(new_out_2_);
+          auto [new_out_2_, distance_comps] =
+              robustPrune(index, std::move(candidates), G, Points, alpha);
+          G[index].update_neighbors(new_out_2_);
           BuildStats.increment_dist(index, distance_comps);
         }
       });
@@ -290,8 +309,7 @@ struct knn_index {
         auto ind = frac * n;
         if (floor <= ind && ceiling > ind) {
           frac += progress_inc;
-          std::cout << "Pass " << 100 * frac << "% complete"
-                    << std::endl;
+          std::cout << "Pass " << 100 * frac << "% complete" << std::endl;
         }
       }
       inc += 1;
@@ -300,5 +318,4 @@ struct knn_index {
     t_bidirect.total();
     t_prune.total();
   }
-
 };
