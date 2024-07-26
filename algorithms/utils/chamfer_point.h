@@ -11,6 +11,7 @@
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "types.h"
+#include <torch/torch.h>
 
 #include <fcntl.h>
 #include <limits>
@@ -19,6 +20,10 @@
 #include <sys/types.h>
 #include <type_traits>
 #include <unistd.h>
+#include <random>
+
+#define COMPILER_BARRIER() __asm__ __volatile__ ("" ::: "memory")
+std::mt19937 rng(42);
 
 template <class Point_> struct Chamfer_Point {
 
@@ -26,6 +31,10 @@ template <class Point_> struct Chamfer_Point {
   // "Float types are NOT allowed here!");
   using T = decltype(Point_::val);
   using distanceType = float;
+  constexpr static int SAMPLING_COUNT = 10;
+  std::vector<int>comparable_indices;
+  torch::Tensor sampled_member_vectors;
+  torch::Tensor member_vectors;
   // template<typename C, typename range> friend struct Quantized_Mips_Point;
 
   struct parameters {
@@ -43,8 +52,7 @@ template <class Point_> struct Chamfer_Point {
     return *(values + i);
   } // I feel like this should probably return the ith vector
 
-  float distance(const Chamfer_Point<Point_> &x) const {
-    // this distance is asymmetric! we iterate over curr vector.
+  float brute(const Chamfer_Point<Point_> &x) const{
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
@@ -64,7 +72,52 @@ template <class Point_> struct Chamfer_Point {
       }
       return_dist1 += curr_min;
     }
+    return return_dist1;
+  }
 
+  float vectorized(const Chamfer_Point<Point_> &x) const{
+    torch::NoGradGuard no_grad;
+    torch::Tensor tensor_inter, max_indices;
+    std::tie(tensor_inter, max_indices) = torch::max(torch::matmul(member_vectors,x.member_vectors.transpose(0, 1)), 1);
+    float tensor_result = -1*torch::sum(tensor_inter).item<float>();
+    return tensor_result;
+  }
+  class ThreadSafeVector {
+public:
+    void push_back(double value) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        vec_.push_back(value);
+          double a = 0;
+          for(auto &i:vec_) a+=i;
+          std::cout<<s_<<" "<<vec_.size()<<" "<<a/vec_.size()<<"\n";
+          std::cout.flush();
+    }
+
+    std::vector<double> get_all() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return vec_;
+    }
+    
+    ThreadSafeVector(std::string s) : s_(s){}
+private:
+    mutable std::mutex mutex_;
+    std::vector<double> vec_;
+    std::string s_;
+};
+
+  float distance(const Chamfer_Point<Point_> &x) const{
+    static ThreadSafeVector bruteV("brute");
+    static ThreadSafeVector vec("vec");
+    COMPILER_BARRIER();
+    auto start = std::chrono::high_resolution_clock::now();
+    // this distance is asymmetric! we iterate over curr vector.
+    auto brute_result = brute(x);
+    COMPILER_BARRIER();
+    auto end = std::chrono::high_resolution_clock::now();
+    COMPILER_BARRIER();
+    // Calculate the duration
+    std::chrono::duration<double> elapsed_brute = end - start;
+    bruteV.push_back(elapsed_brute.count());
     // float return_dist2 = 0;
     // for (int i = 0; i < x_num_vecs; i++) {
     //   T *x_vec = x.values + i * curr_dim;
@@ -84,7 +137,19 @@ template <class Point_> struct Chamfer_Point {
     // }
     //
     // return (return_dist1 + return_dist2) / 2;
-    return return_dist1;
+    COMPILER_BARRIER();
+    auto start_v = std::chrono::high_resolution_clock::now();
+    auto tensor_result = vectorized(x);
+    COMPILER_BARRIER();
+    auto end_v = std::chrono::high_resolution_clock::now();
+    COMPILER_BARRIER();
+    std::chrono::duration<double> elapsed_v = end_v - start_v;
+    vec.push_back(elapsed_v.count());
+    // disable autograd 
+    if(abs(tensor_result - brute_result) > 1e-4 ){
+      exit(-1);
+    }
+    return tensor_result;
   }
 
   void prefetch() const {
@@ -98,7 +163,20 @@ template <class Point_> struct Chamfer_Point {
   Chamfer_Point() : values(nullptr), id_(-1), params(0) {}
 
   Chamfer_Point(T *values, long id, parameters params)
-      : values(values), id_(id), params(params) {}
+      : values(values), id_(id), params(params) {
+      // random sampling/kmeans for comparable indices
+      {
+        for(int i=0;i<params.num_vectors;i++)
+          if(rng()%params.num_vectors < SAMPLING_COUNT)
+            comparable_indices.push_back(i);
+      }
+      // make a tensor from the chosen indices
+      torch::NoGradGuard no_grad;
+      auto member_options = torch::TensorOptions().dtype(torch::kFloat32).layout(torch::kStrided).device(torch::kCPU).requires_grad(false);
+      member_vectors = torch::from_blob(values, {params.num_vectors, params.dims}, member_options);
+      auto sampling_options = torch::TensorOptions().dtype(torch::kInt32).layout(torch::kStrided).device(torch::kCPU).requires_grad(false);
+      sampled_member_vectors = member_vectors.index({torch::tensor(comparable_indices, torch::kInt64)});
+    }
 
   bool operator==(const Chamfer_Point<Point_> &q) const {
     if (q.params.num_vectors != params.num_vectors) {

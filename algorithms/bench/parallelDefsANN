@@ -1,3 +1,7 @@
+TORCH_INCLUDE := $(shell python3.10 -c "import torch; from torch.utils.cpp_extension import include_paths; print(' '.join(['-I ' + p for p in include_paths()]))")
+TORCH_LIB_DIRECTORY := $(shell python3.10 -c "import torch; from torch.utils.cpp_extension import library_paths; print(' '.join(['-L ' + p + '/' for p in library_paths()]))")
+TORCH_LIB :=  $(shell python3.10 -c "import torch; from torch.utils.cpp_extension import library_paths; import glob; import os; paths = library_paths(); files = [] ; [files.extend(glob.glob(os.path.join(p, '*'))) for p in paths] ; print(' '.join([ '-l' + os.path.basename(f).split('.', maxsplit=1)[0][3:] for f in files if len(os.path.basename(f).split('.')) == 2 ]))")
+
 ifeq (, $(shell which jemalloc-config))
 JEMALLOC =
 else
@@ -5,8 +9,8 @@ JEMALLOCLD = $(shell jemalloc-config --libdir)
 JEMALLOC = -L$(JEMALLOCLD) -ljemalloc 
 endif
 
-CCFLAGS = -mcx16 -O3 -std=c++17 -march=native -DNDEBUG -I .
-CLFLAGS = -ldl $(JEMALLOC)
+CCFLAGS =   -D_GLIBCXX_USE_CXX11_ABI=0 -mcx16 -O3 -std=c++17 -march=native -DNDEBUG -I . $(TORCH_INCLUDE)
+CLFLAGS = $(TORCH_LIB_DIRECTORY) -ldl $(JEMALLOC) $(TORCH_LIB)
 
 OMPFLAGS = -DPARLAY_OPENMP -fopenmp
 CILKFLAGS = -DPARLAY_CILK -fcilkplus

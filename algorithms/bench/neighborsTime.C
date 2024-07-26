@@ -56,9 +56,9 @@ void timeNeighbors(Graph<indexType> &G, PointRange &Query_Points, long k,
       },
       [&]() {});
 
-  if (outFile != NULL) {
-    G.save(outFile);
-  }
+  // if (outFile != NULL) {
+  //   G.save(outFile);
+  // }
 }
 
 int main(int argc, char *argv[]) {
@@ -236,8 +236,12 @@ int main(int argc, char *argv[]) {
         G = Graph<unsigned int>(gFile);
       using Point = Chamfer_Point<Mips_Point<float>>;
       using PR = ChamferPointRange<float, Point>;
-      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
-                                     graph_built, Points);
+      if(graph_built)
+        timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, rFile, GT, rFile,
+                                      graph_built, Points);
+      else
+        timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
+                              graph_built, Points);
     }
   } else if (tp == "uint8") {
     if (df == "Euclidian") {
