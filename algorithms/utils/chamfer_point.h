@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <random>
 
-#define COMPILER_BARRIER() __asm__ __volatile__ ("" ::: "memory")
 std::mt19937 rng(42);
 
 template <class Point_> struct Chamfer_Point {
@@ -52,7 +51,7 @@ template <class Point_> struct Chamfer_Point {
     return *(values + i);
   } // I feel like this should probably return the ith vector
   template <bool use_samples>
-  float brute(const Chamfer_Point<Point_> &x) const{
+  float unvectorized_chamfer_compute(const Chamfer_Point<Point_> &x) const{
     // this distance is asymmetric! we iterate over curr vector.
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
@@ -93,86 +92,10 @@ template <class Point_> struct Chamfer_Point {
     float tensor_result = -1*torch::sum(tensor_inter).item<float>();
     return tensor_result;
   }
-  class ThreadSafeVector {
-public:
-    void push_back(double value) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        vec_.push_back(value);
-        if(s_!="error"){
-          double a = 0;
-          for(auto &i:vec_) a+=i;
-          std::cout<<s_<<" "<<vec_.size()<<" "<<a/vec_.size()<<"\n";
-          std::cout.flush();
-        }
-        if(vec_.size()%1000 == 0 && s_=="error"){
-          std::cout<<" DECILES PERCENTAGE ERROR \n";
-          std::sort(vec_.begin(),vec_.end());
-          for(int i=0;i<10;i++){
-            std::cout<<vec_[ ((i + 1)*(vec_.size() - 1))/10 ]<<" ";
-          }
-          std::cout<<"\n";
-          std::cout.flush();
-        }
-    }
 
-    std::vector<double> get_all() const {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return vec_;
-    }
-    
-    ThreadSafeVector(std::string s) : s_(s){}
-private:
-    mutable std::mutex mutex_;
-    std::vector<double> vec_;
-    std::string s_;
-};
-
+  // TODO: add std::forward here
   float distance(const Chamfer_Point<Point_> &x) const{
-    static ThreadSafeVector bruteV("baseline");
-    static ThreadSafeVector vec("sampled");
-    static ThreadSafeVector error("error");
-    COMPILER_BARRIER();
-    auto start = std::chrono::high_resolution_clock::now();
-    auto brute_result = brute<false>(x);
-    COMPILER_BARRIER();
-    auto end = std::chrono::high_resolution_clock::now();
-    COMPILER_BARRIER();
-    // Calculate the duration
-    std::chrono::duration<double> elapsed_brute = end - start;
-    bruteV.push_back(elapsed_brute.count());
-    // float return_dist2 = 0;
-    // for (int i = 0; i < x_num_vecs; i++) {
-    //   T *x_vec = x.values + i * curr_dim;
-    //   float curr_min = std::numeric_limits<float>::infinity();
-    //   for (int j = 0; j < curr_num_vecs; j++) {
-    //     T *curr_vec = values + j * curr_dim;
-    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
-    //       curr_min =
-    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
-    //     } else {
-    //       curr_min =
-    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec,
-    //           curr_dim));
-    //     }
-    //   }
-    //   return_dist2 += curr_min;
-    // }
-    //
-    // return (return_dist1 + return_dist2) / 2;
-    COMPILER_BARRIER();
-    auto start_v = std::chrono::high_resolution_clock::now();
-    auto tensor_result = brute<true>(x);
-    COMPILER_BARRIER();
-    auto end_v = std::chrono::high_resolution_clock::now();
-    COMPILER_BARRIER();
-    std::chrono::duration<double> elapsed_v = end_v - start_v;
-    vec.push_back(elapsed_v.count());
-    // disable autograd 
-    // if(abs(tensor_result - brute_result) > 1e-4 ){
-    //   exit(-1);
-    // }
-    error.push_back(((tensor_result*params.num_vectors)/comparable_indices.size() - brute_result)/brute_result);
-    return tensor_result;
+    return unvectorized_chamfer_compute<true>(x);
   }
 
   void prefetch() const {

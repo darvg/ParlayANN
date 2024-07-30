@@ -29,4 +29,4 @@ T=/ssd1/data/gist
 ./neighbors -R 64 -L 128 -alpha 0.5 -two_pass 0 -data_type float -dist_func chamfer \
 	-query_path /scratch/msmarco-colbert/query/msmarco_query_tiny.bin \
 	-gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small_q_tiny.bin \
-	-res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small.bin
+	-res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k.bin
