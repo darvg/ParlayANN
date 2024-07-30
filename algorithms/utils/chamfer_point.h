@@ -51,14 +51,14 @@ template <class Point_> struct Chamfer_Point {
   T operator[](long i) const {
     return *(values + i);
   } // I feel like this should probably return the ith vector
-
+  template <bool use_samples>
   float brute(const Chamfer_Point<Point_> &x) const{
+    // this distance is asymmetric! we iterate over curr vector.
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
     float return_dist1 = 0.;
-    for (int i = 0; i < curr_num_vecs; i++) {
-      T *curr_vec = values + i * curr_dim;
+    auto find_optimal_b = [&](T* curr_vec){
       float curr_min = std::numeric_limits<float>::infinity();
       for (int j = 0; j < x_num_vecs; j++) {
         T *x_vec = x.values + j * curr_dim;
@@ -70,7 +70,18 @@ template <class Point_> struct Chamfer_Point {
               std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
         }
       }
-      return_dist1 += curr_min;
+      return curr_min;
+    };
+    if constexpr (use_samples) {
+      for (int i : comparable_indices) {
+        T *curr_vec = values + i * curr_dim;
+        return_dist1 += find_optimal_b(curr_vec);
+      }
+    }else{
+      for (int i = 0; i < curr_num_vecs; i++) {
+        T *curr_vec = values + i * curr_dim;
+        return_dist1 += find_optimal_b(curr_vec);
+      }
     }
     return return_dist1;
   }
@@ -87,10 +98,21 @@ public:
     void push_back(double value) {
         std::lock_guard<std::mutex> lock(mutex_);
         vec_.push_back(value);
+        if(s_!="error"){
           double a = 0;
           for(auto &i:vec_) a+=i;
           std::cout<<s_<<" "<<vec_.size()<<" "<<a/vec_.size()<<"\n";
           std::cout.flush();
+        }
+        if(vec_.size()%1000 == 0 && s_=="error"){
+          std::cout<<" DECILES PERCENTAGE ERROR \n";
+          std::sort(vec_.begin(),vec_.end());
+          for(int i=0;i<10;i++){
+            std::cout<<vec_[ ((i + 1)*(vec_.size() - 1))/10 ]<<" ";
+          }
+          std::cout<<"\n";
+          std::cout.flush();
+        }
     }
 
     std::vector<double> get_all() const {
@@ -106,12 +128,12 @@ private:
 };
 
   float distance(const Chamfer_Point<Point_> &x) const{
-    static ThreadSafeVector bruteV("brute");
-    static ThreadSafeVector vec("vec");
+    static ThreadSafeVector bruteV("baseline");
+    static ThreadSafeVector vec("sampled");
+    static ThreadSafeVector error("error");
     COMPILER_BARRIER();
     auto start = std::chrono::high_resolution_clock::now();
-    // this distance is asymmetric! we iterate over curr vector.
-    auto brute_result = brute(x);
+    auto brute_result = brute<false>(x);
     COMPILER_BARRIER();
     auto end = std::chrono::high_resolution_clock::now();
     COMPILER_BARRIER();
@@ -139,16 +161,17 @@ private:
     // return (return_dist1 + return_dist2) / 2;
     COMPILER_BARRIER();
     auto start_v = std::chrono::high_resolution_clock::now();
-    auto tensor_result = vectorized(x);
+    auto tensor_result = brute<true>(x);
     COMPILER_BARRIER();
     auto end_v = std::chrono::high_resolution_clock::now();
     COMPILER_BARRIER();
     std::chrono::duration<double> elapsed_v = end_v - start_v;
     vec.push_back(elapsed_v.count());
     // disable autograd 
-    if(abs(tensor_result - brute_result) > 1e-4 ){
-      exit(-1);
-    }
+    // if(abs(tensor_result - brute_result) > 1e-4 ){
+    //   exit(-1);
+    // }
+    error.push_back(((tensor_result*params.num_vectors)/comparable_indices.size() - brute_result)/brute_result);
     return tensor_result;
   }
 
