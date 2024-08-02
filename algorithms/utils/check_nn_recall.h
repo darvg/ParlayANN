@@ -205,7 +205,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
       QP.cut = cut;
       for (float Q : beams) {
         QP.beamSize = Q;
-        if (Q > r) {
+        if (Q >= r) {
           std::cout << "test" << std::endl;
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(

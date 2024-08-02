@@ -21,8 +21,20 @@ P=/ssd1/data/bigann
 # ./neighbors -R 128 -L 256 -alpha 1.0 -data_type uint8 -two_pass 0 -dist_func Euclidian -k 10 -query_path $P/ssnpp_nonzero.u8bin -gt_path $P/ssnpp-nonzero-1M -res_path test.csv -base_path $P/FB_ssnpp_database.u8bin.crop_nb_1000000
 
 T=/ssd1/data/gist
-./neighbors -R 64 -L 128 -alpha 0.5 -two_pass 0 -data_type float -dist_func chamfer \
-	-graph_path /scratch/msmarco-colbert/indices/graph_chamfer2 \
-	-query_path /scratch/msmarco-colbert/query/msmarco_query_tiny.bin \
-	-gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small_q_tiny.bin \
-	-res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small.bin
+# ./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -data_type float -dist_func chamfer \
+# 	-graph_path /scratch/msmarco-colbert/indices/graph_chamfer2 \
+# 	-query_path /scratch/msmarco-colbert/query/msmarco_query_tiny.bin \
+# 	-gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small_q_tiny.bin \
+# 	-res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small.bin
+
+# ./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0  -data_type float -dist_func chamfer \
+#       -graph_path /scratch/msmarco-colbert/indices/graph_chamfer_nosym_newneworder \
+#       -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny.bin \
+#       -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small100k_q_tiny.bin \
+#       -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k.bin
+
+./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -k 100 -data_type float -dist_func mips \
+        -graph_path /scratch/msmarco-colbert/indices/graph_muvera \
+        -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny_muvera.bin \
+        -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small100k_q_tiny.bin \
+        -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k_muvera.bin

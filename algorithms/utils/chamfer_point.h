@@ -7,6 +7,7 @@
 #include "NSGDist.h"
 #include "euclidian_point.h"
 #include "mips_point.h"
+#include "threadlocal.h"
 #include "parlay/internal/file_map.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
@@ -19,6 +20,10 @@
 #include <sys/types.h>
 #include <type_traits>
 #include <unistd.h>
+
+#include <cblas.h>
+
+auto chamfer_buffer = threadlocal::buffer<float, 300 * 300 * 4, 161>();
 
 template <class Point_> struct Chamfer_Point {
 
@@ -49,20 +54,33 @@ template <class Point_> struct Chamfer_Point {
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
     float return_dist1 = 0.;
-    for (int i = 0; i < curr_num_vecs; i++) {
-      T *curr_vec = values + i * curr_dim;
-      float curr_min = std::numeric_limits<float>::infinity();
-      for (int j = 0; j < x_num_vecs; j++) {
-        T *x_vec = x.values + j * curr_dim;
-        if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
-          curr_min =
-              std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
-        } else {
-          curr_min =
-              std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
-        }
+    // for (int i = 0; i < curr_num_vecs; i++) {
+    //   T *curr_vec = values + i * curr_dim;
+    //   float curr_min = std::numeric_limits<float>::infinity();
+    //   for (int j = 0; j < x_num_vecs; j++) {
+    //     T *x_vec = x.values + j * curr_dim;
+    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
+    //       curr_min =
+    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
+    //     } else {
+    //       curr_min =
+    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
+    //     }
+    //   }
+    //   return_dist1 += curr_min;
+    // }
+    // do a matmul to get pairwise distances
+    if constexpr (std::is_same_v<Point_, Mips_Point<float>>) {
+      cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, curr_num_vecs,
+                  x_num_vecs, curr_dim, -1.0, values, curr_dim, x.values,
+                  curr_dim, 0.0, chamfer_buffer.get(), x_num_vecs);
+      for (int i = 0; i < curr_num_vecs; i++) {
+        return_dist1 += *std::min_element(
+            chamfer_buffer.get() + i * x_num_vecs,
+            chamfer_buffer.get() + (i + 1) * x_num_vecs);
       }
-      return_dist1 += curr_min;
+    } else {
+      raise("Not implemented");
     }
 
     // float return_dist2 = 0;

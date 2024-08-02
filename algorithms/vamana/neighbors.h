@@ -73,6 +73,8 @@ void ANN_(Graph<indexType> &G, long k, BuildParams &BP,
   // G.save(res_file);
   // exit(-1);
 
+  std::cout << "Graph built" << std::endl;
+
   long build_num_distances = parlay::reduce(
       parlay::map(BuildStats.distances, [](auto x) { return (long)x; }));
 

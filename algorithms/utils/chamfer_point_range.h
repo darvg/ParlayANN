@@ -20,6 +20,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+
+
 template <typename T_, class Point_> struct ChamferPointRange {
   using T = T_;
   using Point = Point_;
