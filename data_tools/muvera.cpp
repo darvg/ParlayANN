@@ -7,6 +7,7 @@
 #include <omp.h>
 #include <cblas.h>
 
+
 const int nbits = 6;
 const int dproj = 10240;
 const int b = 1 << nbits;
@@ -30,12 +31,13 @@ int main() {
     
     int d = shape[1];
     int dlarge = b * rreps * d;
+    long long dproj_size = dproj * dlarge;
     
     std::cout << "Loaded " << (query ? "query" : "base") << " data with shape " << shape[0] << " x " << shape[1] << std::endl;
     std::cout << "Loaded " << pts.size() << " multivectors" << std::endl;
     
     // Generate down projection matrix
-    std::vector<float> down_proj(dproj * dlarge);
+    std::vector<float> down_proj(dproj_size);
     generate_down_proj(down_proj, dproj, dlarge);
     
     std::cout << "Generated down projection matrix with dimensions " << dproj << " x " << dlarge << std::endl;
@@ -87,10 +89,10 @@ void load_data(const std::string& filename, std::vector<std::vector<float>>& pts
 }
 
 void generate_down_proj(std::vector<float>& down_proj, int rows, int cols) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(42);
     std::uniform_int_distribution<> dis(0, 1);
     
+    #pragma omp parallel
     for (int i = 0; i < rows * cols; ++i) {
         down_proj[i] = dis(gen) == 0 ? -1.0f : 1.0f;
     }
@@ -99,7 +101,7 @@ void generate_down_proj(std::vector<float>& down_proj, int rows, int cols) {
 void generate_lsh_partitions(std::vector<std::vector<float>>& lsh_partitions, int nbits, int d, int rreps) {
     std::mt19937 gen(42);  // Fixed seed for reproducibility
     std::normal_distribution<> dis(0.0, 1.0);
-    
+
     for (int i = 0; i < rreps; ++i) {
         for (int j = 0; j < nbits * d; ++j) {
             lsh_partitions[i][j] = dis(gen);
@@ -110,25 +112,28 @@ void generate_lsh_partitions(std::vector<std::vector<float>>& lsh_partitions, in
 void process_point(const std::vector<float>& pt, const std::vector<float>& down_proj, 
                    const std::vector<std::vector<float>>& lsh_partitions, std::vector<float>& final_emb, 
                    int d, int dproj, bool query) {
-    std::vector<float> codes(pt.size() / d);
+    size_t num_curr_vecs = pt.size() / d;
+    std::vector<float> codes(num_curr_vecs * nbits); // pt.size() / d = num vecs in pt
     std::vector<int> a(nbits);
     for (int i = 0; i < nbits; ++i) {
         a[i] = 1 << (nbits - 1 - i);
     }
     
     for (int i = 0; i < rreps; ++i) {
-        // Compute codes
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 
-                    pt.size() / d, nbits, d, 
-                    1.0f, pt.data(), d, 
-                    lsh_partitions[i].data(), d, 
+        // Compute vector - plane dotproducts
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    num_curr_vecs, nbits, d,
+                    1.0f, pt.data(), d,
+                    lsh_partitions[i].data(), nbits, 
                     0.0f, codes.data(), nbits);
         
+        // converte the dotproducts into bitstrings
         for (float& code : codes) {
             code = code > 0 ? 1.0f : 0.0f;
         }
         
-        std::vector<int> bucket_codes(codes.size());
+        // convert bitstrings into plain numbers
+        std::vector<int> bucket_codes(num_curr_vecs);
         for (size_t j = 0; j < codes.size(); ++j) {
             int code = 0;
             for (int k = 0; k < nbits; ++k) {
