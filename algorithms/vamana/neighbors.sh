@@ -33,8 +33,8 @@ T=/ssd1/data/gist
 #       -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small100k_q_tiny.bin \
 #       -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k.bin
 
-./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -k 100 -data_type float -dist_func mips \
-        -graph_path /scratch/msmarco-colbert/indices/graph_muvera \
-        -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny_muvera.bin \
-        -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small100k_q_tiny.bin \
-        -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k_muvera.bin
+./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -k 100 -data_type float -dist_func chamfer \
+        -graph_path /scratch/msmarco-colbert/indices/graph_chamfer_2M_base_5k_queuries \
+        -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny_5k.bin \
+        -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small_2M_q_tiny_5k.bin \
+        -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small_2M.bin

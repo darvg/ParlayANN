@@ -7,7 +7,7 @@ vec_to_bin : vec_to_bin.cpp
 	$(CC) $(CFLAGS) -o vec_to_bin vec_to_bin.cpp $(LFLAGS) 
 
 compute_groundtruth : compute_groundtruth.cpp ../algorithms/utils/*.h
-	$(CC) $(CFLAGS) -o compute_groundtruth compute_groundtruth.cpp $(LFLAGS) -g -O3
+	$(CC) $(MKL_CFLAGS) -o compute_groundtruth compute_groundtruth.cpp  $(MKL_LFLAGS) -g -O3
 
 blocked_groundtruth: blocked_groundtruth.cpp ../algorithms/utils/*.h
 	$(CC) $(CFLAGS) -o blocked_groundtruth blocked_groundtruth.cpp $(LFLAGS) -g -O3
