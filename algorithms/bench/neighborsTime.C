@@ -23,6 +23,7 @@
 #include "../utils/NSGDist.h"
 #include "../utils/euclidian_point.h"
 #include "../utils/graph.h"
+#include "mkl.h"
 #include "../utils/mips_point.h"
 #include "../utils/point_range.h"
 #include "parlay/parallel.h"
@@ -62,6 +63,7 @@ void timeNeighbors(Graph<indexType> &G, PointRange &Query_Points, long k,
 }
 
 int main(int argc, char *argv[]) {
+  mkl_set_num_threads(1);
   commandLine P(
       argc, argv,
       "[-a <alpha>] [-d <delta>] [-R <deg>]"
@@ -236,7 +238,7 @@ int main(int argc, char *argv[]) {
         G = Graph<unsigned int>(gFile);
       using Point = Chamfer_Point<Mips_Point<float>>;
       using PR = ChamferPointRange<float, Point>;
-      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
+      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, oFile,
                                      graph_built, Points);
     }
   } else if (tp == "uint8") {

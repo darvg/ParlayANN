@@ -69,6 +69,7 @@ template <class Point_> struct Chamfer_Point {
     //   }
     //   return_dist1 += curr_min;
     // }
+    // return return_dist1;
     // do a matmul to get pairwise distances
     if constexpr (std::is_same_v<Point_, Mips_Point<float>>) {
       cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, curr_num_vecs,
