@@ -121,10 +121,13 @@ void process_point(const std::vector<float>& pt, const std::vector<float>& down_
     
     for (int i = 0; i < rreps; ++i) {
         // Compute vector - plane dotproducts
+        // A = num_curr_vecs x d
+        // B = nbits x d
+        // C = num_curr_vecs x nbits
         cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
                     num_curr_vecs, nbits, d,
                     1.0f, pt.data(), d,
-                    lsh_partitions[i].data(), nbits, 
+                    lsh_partitions[i].data(), d, 
                     0.0f, codes.data(), nbits);
         
         // converte the dotproducts into bitstrings
