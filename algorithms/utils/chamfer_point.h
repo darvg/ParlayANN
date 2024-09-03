@@ -54,42 +54,35 @@ template <class Point_> struct Chamfer_Point {
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
     float return_dist1 = 0.;
-    float return_dist2 = 0.;
-    for (int i = 0; i < curr_num_vecs; i++) {
-      T *curr_vec = values + i * curr_dim;
-      float curr_min = std::numeric_limits<float>::infinity();
-      for (int j = 0; j < x_num_vecs; j++) {
-        T *x_vec = x.values + j * curr_dim;
-        if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
-          curr_min =
-              std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
-        } else {
-          curr_min =
-              std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
-        }
-      }
-      return_dist1 += curr_min;
-    }
-    return return_dist1;
+    // for (int i = 0; i < curr_num_vecs; i++) {
+    //   T *curr_vec = values + i * curr_dim;
+    //   float curr_min = std::numeric_limits<float>::infinity();
+    //   for (int j = 0; j < x_num_vecs; j++) {
+    //     T *x_vec = x.values + j * curr_dim;
+    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
+    //       curr_min =
+    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
+    //     } else {
+    //       curr_min =
+    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
+    //     }
+    //   }
+    //   return_dist1 += curr_min;
+    // }
+    // return return_dist1;
     // do a matmul to get pairwise distances
     if constexpr (std::is_same_v<Point_, Mips_Point<float>>) {
       cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, curr_num_vecs,
                   x_num_vecs, curr_dim, -1.0, values, curr_dim, x.values,
                   curr_dim, 0.0, chamfer_buffer.get(), x_num_vecs);
       for (int i = 0; i < curr_num_vecs; i++) {
-        return_dist2 += *std::min_element(
+        return_dist1 += *std::min_element(
             chamfer_buffer.get() + i * x_num_vecs,
             chamfer_buffer.get() + (i + 1) * x_num_vecs);
       }
     } else {
       raise("Not implemented");
     }
-    // if(abs(return_dist2 - return_dist1) > 1e-4){
-    //   std::cout<<return_dist2<<" "<<return_dist1<<std::endl;
-    //   exit(-1);
-    // }else{
-    //   std::cout<<"OKAY!\n";
-    // }
 
     // float return_dist2 = 0;
     // for (int i = 0; i < x_num_vecs; i++) {

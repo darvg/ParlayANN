@@ -8,6 +8,7 @@
 #include <random>
 #include <locale>
 #include <chrono>
+#include "mkl.h"
 // #include "utils/types.h"
 #include "utils/chamfer_point.h"
 #include "utils/chamfer_point_range.h"
@@ -125,6 +126,7 @@ void write_ibin(parlay::sequence<parlay::sequence<pid>> &result,
 }
 
 int main(int argc, char *argv[]) {
+  mkl_set_num_threads(1);
   // setting locale for number formatting
   std::locale::global(std::locale("en_US.utf8"));
   std::cout.imbue(std::locale());
