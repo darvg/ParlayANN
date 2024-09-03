@@ -34,7 +34,20 @@ T=/ssd1/data/gist
 #       -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k.bin
 
 ./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -k 100 -data_type float -dist_func chamfer \
+<<<<<<< HEAD
         -graph_path /scratch/msmarco-colbert/indices/graph_chamfer_full_corpus_base \
         -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny_5k.bin \
         -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_full_corpus_5k_queries.bin \
         -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_metadata_combined.bin
+=======
+        -graph_outfile /scratch/msmarco-colbert/indices/graph_chamfer_2M_docs_5k_queries \
+        -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny_5k.bin \
+        -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_batch_processing_test.bin \
+        -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small_2M.bin
+
+# ./neighbors -R 200 -L 600 -alpha 1.0 -two_pass 0 -k 100 -data_type float -dist_func chamfer \
+#         -graph_outfile /scratch/msmarco-colbert/indices/graph_chamfer_2M_docs_5k_queries \
+#         -query_path /scratch/msmarco-colbert/query/msmarco_query_tiny.bin \
+#         -gt_path /scratch/msmarco-colbert/gts/msmarco_gt_b_small100k_q_tiny.bin \
+#         -res_path test_tiny.csv -base_path /scratch/msmarco-colbert/base/msmarco_base_small100k.bin
+>>>>>>> harsh/chamfer_diskann
