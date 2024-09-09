@@ -72,10 +72,10 @@ template <class Point_> struct Chamfer_Point {
     // return return_dist1;
     // do a matmul to get pairwise distances
     if constexpr (std::is_same_v<Point_, Mips_Point<float>>) {
-      cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, curr_num_vecs,
+      cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, std::min(curr_num_vecs, 50),
                   x_num_vecs, curr_dim, -1.0, values, curr_dim, x.values,
                   curr_dim, 0.0, chamfer_buffer.get(), x_num_vecs);
-      for (int i = 0; i < curr_num_vecs; i++) {
+      for (int i = 0; i < std::min(curr_num_vecs, 50); i++) {
         return_dist1 += *std::min_element(
             chamfer_buffer.get() + i * x_num_vecs,
             chamfer_buffer.get() + (i + 1) * x_num_vecs);
@@ -103,11 +103,11 @@ template <class Point_> struct Chamfer_Point {
     // }
     //
     // return (return_dist1 + return_dist2) / 2;
-    return return_dist1;
+    return return_dist1 / std::min(curr_num_vecs, 50);
   }
 
   void prefetch() const {
-    int l = (params.dims * params.num_vectors * sizeof(T) - 1) / 64 + 1;
+    int l = (params.dims * std::min(params.num_vectors, 50) * sizeof(T) - 1) / 64 + 1;
     for (int i = 0; i < l; i++)
       __builtin_prefetch((char *)values + i * 64);
   }
@@ -117,7 +117,46 @@ template <class Point_> struct Chamfer_Point {
   Chamfer_Point() : values(nullptr), id_(-1), params(0) {}
 
   Chamfer_Point(T *values, long id, parameters params)
-      : values(values), id_(id), params(params) {}
+      : values(values), id_(id), params(params) {
+        static std::vector<bool> jumbled(5e7);
+        if (!jumbled[id_]){
+          jumbled[id_] = 1;
+          std::vector <int32_t> permutation (params.num_vectors);
+          for(int i = 0; i < params.num_vectors; i++)
+            permutation[i] = i;
+          std::mt19937 rng(id);
+          std::shuffle(permutation.begin(), permutation.end(), rng);
+          std::vector <int32_t> rpermutation (params.num_vectors);
+	  std::vector <int32_t> cpermutation (params.num_vectors);
+          for(int i = 0; i < params.num_vectors; i++){
+            rpermutation[i] = i;
+	    cpermutation[i] = i;
+	  }
+          for(int i = 0; i < params.num_vectors; i++){
+	    int32_t location_to_swap_with = rpermutation[permutation[i]];
+            if(location_to_swap_with == i) continue;
+            else{
+	      auto swap_memory_location = [](void* const a, void* const b, const size_t n ){
+  		unsigned char* p;
+  		unsigned char* q;
+  		unsigned char* const sentry = (unsigned char*)a + n;
+
+  		for ( p = (unsigned char*)a, q = (unsigned char*)b; p < sentry; ++p, ++q ) {
+     			const unsigned char t = *p;
+     			*p = *q;
+     			*q = t;
+  		}
+	      };
+ 	      int32_t vector_size = params.dims;
+	      swap_memory_location(values + i * vector_size , values + location_to_swap_with * vector_size, vector_size);
+	      rpermutation[cpermutation[i]] = location_to_swap_with;
+	      rpermutation[cpermutation[location_to_swap_with]] = i;
+	      std::swap(cpermutation[i], cpermutation[location_to_swap_with]);
+              // swap rpermutation[i] and ith position in vector
+            }
+          }
+        }
+      }
 
   bool operator==(const Chamfer_Point<Point_> &q) const {
     if (q.params.num_vectors != params.num_vectors) {
@@ -162,3 +201,4 @@ private:
   long id_;
   parameters params;
 };
+

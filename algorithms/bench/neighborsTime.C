@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
         G = Graph<unsigned int>(gFile);
       using Point = Chamfer_Point<Mips_Point<float>>;
       using PR = ChamferPointRange<float, Point>;
-      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, oFile,
+      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
                                      graph_built, Points);
     }
   } else if (tp == "uint8") {

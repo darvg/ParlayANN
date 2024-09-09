@@ -84,6 +84,7 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
     size_t n = Query_Points.size();
 
     int numCorrect = 0;
+    int numCorrect_1at100 = 0;
     for (indexType i = 0; i < n; i++) {
       // std::cout << i << ": ";
       parlay::sequence<int> results_with_ties;
@@ -105,18 +106,18 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
         // std::cout << all_ngh[i][l] << " ";
       }
       // std::cout << results_with_ties[0] << std::endl;
-      // for (indexType l = 0; l < results_with_ties.size(); l++) {
-      //   if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
-      //   {
-      //     numCorrect += 1;
-      //   }
-      // }
+      for (indexType l = 0; l < results_with_ties.size(); l++) {
+        if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
+        {
+          numCorrect += 1;
+        }
+      }
       if (reported_nbhs.find(results_with_ties[0]) != reported_nbhs.end()) {
-        numCorrect += 1;
+        numCorrect_1at100 += 1;
       }
     }
-    // recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
-    recall = static_cast<float>(numCorrect) / static_cast<float>(1 * n);
+    recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
+    std::cout << "Recall at 1@100 : " << static_cast<float>(numCorrect_1at100) / static_cast<float>(1 * n) << std::endl;
   }
   float QPS = Query_Points.size() / query_time;
   if (verbose)
@@ -192,7 +193,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {100};
+  beams = {100,120,150,200,500,100};
   if (k == 0)
     allr = {10};
   else
