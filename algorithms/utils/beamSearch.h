@@ -142,6 +142,9 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
 
   // The main loop.  Terminate beam search when the entire frontier
   // has been visited or have reached max_visit.
+  int32_t kill_counter = 0;
+  int32_t last_remain  = 0;
+
   while (remain > 0 && num_visited < QP.limit) {
     // the next node to visit is the unvisited frontier node that is closest to
     // p
@@ -214,6 +217,11 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
         std::set_difference(frontier.begin(), frontier.end(), visited.begin(),
                             visited.end(), unvisited_frontier.begin(), less) -
         unvisited_frontier.begin();
+    if(last_remain - remain == 1)
+      kill_counter++;
+    else
+      kill_counter = 0;
+    last_remain = remain;
   }
 
   return std::make_pair(std::make_pair(parlay::to_sequence(frontier),

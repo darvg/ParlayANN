@@ -70,7 +70,7 @@ void ANN_(Graph<indexType> &G, long k, BuildParams &BP,
   Graph_ G_(name, params, G.size(), avg_deg, max_deg, idx_time);
   G_.print();
 
- // G.save(res_file);
+  G.save(res_file);
   // exit(-1);
 
   std::cout << "Graph built" << std::endl;
