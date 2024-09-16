@@ -89,7 +89,8 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
       // std::cout << i << ": ";
       parlay::sequence<int> results_with_ties;
       for (indexType l = 0; l < k; l++) {
-        results_with_ties.push_back(GT.coordinates(i, l));
+        if(GT.coordinates(i, l) >= 1e9)
+          results_with_ties.push_back(GT.coordinates(i, l));
       }
       Point qp = Query_Points[i];
       // float last_dist = qp.distance(Base_Points[GT.coordinates(i, k - 1)]);
@@ -110,13 +111,14 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
         if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
         {
           numCorrect += 1;
+          break;
         }
       }
       if (reported_nbhs.find(results_with_ties[0]) != reported_nbhs.end()) {
         numCorrect_1at100 += 1;
       }
     }
-    recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
+    recall = static_cast<float>(numCorrect) / static_cast<float>(n);
     std::cout << "Recall at 1@100 : " << static_cast<float>(numCorrect_1at100) / static_cast<float>(1 * n) << std::endl;
   }
   float QPS = Query_Points.size() / query_time;
@@ -193,7 +195,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {100,120,150,200,500,100};
+  beams = {10,20,50,80,100,120,150,200,500,100};
   if (k == 0)
     allr = {10};
   else

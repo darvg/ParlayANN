@@ -7,7 +7,6 @@
 #include <omp.h>
 #include <cblas.h>
 
-
 const int nbits = 6;
 const int dproj = 10240;
 const int b = 1 << nbits;
@@ -20,18 +19,21 @@ void generate_down_proj(std::vector<float>& down_proj, int rows, int cols);
 void generate_lsh_partitions(std::vector<std::vector<float>>& lsh_partitions, int nbits, int d, int rreps);
 void process_point(const std::vector<float>& pt, const std::vector<float>& down_proj, 
                    const std::vector<std::vector<float>>& lsh_partitions, std::vector<float>& final_emb, 
-                   int d, int dproj, bool query);
+                   int d, long long dproj, bool query);
 
 int main() {
     std::vector<std::vector<float>> pts;
     std::vector<int> shape(2);
 
     // Load data
-    load_data("./msmarco_base_small100k.bin", pts, shape);
+    if(query)
+        load_data("./quora_query_base.bin", pts, shape);
+    else
+        load_data("./quora_base", pts, shape);
     
     int d = shape[1];
     int dlarge = b * rreps * d;
-    long long dproj_size = dproj * dlarge;
+    long long dproj_size = (1LL * dproj) * dlarge;
     
     std::cout << "Loaded " << (query ? "query" : "base") << " data with shape " << shape[0] << " x " << shape[1] << std::endl;
     std::cout << "Loaded " << pts.size() << " multivectors" << std::endl;
@@ -48,52 +50,67 @@ int main() {
     
     std::cout << "Generated " << rreps << " LSH tables to generate embs of dimension " << dlarge << std::endl;
     
-    // Process points
-    std::vector<std::vector<float>> final_embs(pts.size(), std::vector<float>(dproj, 0.0f));
+    std::string filename;
+    if(query)
+        filename = "./quora_query_muvera.bin";
+    else
+        filename = "./quora_base_muvera.bin";
+    std::ofstream outfile(filename, std::ios::binary);
     
-    #pragma omp parallel for
-    for (size_t i = 0; i < pts.size(); ++i) {
-        process_point(pts[i], down_proj, lsh_partitions, final_embs[i], d, dproj, query);
-    }
-    
-    std::cout << "Generated " << final_embs.size() << " embs with size " << dproj << std::endl;
-    
-    // Save results
-    std::ofstream outfile("./msmarco_base_small100k_muvera.bin", std::ios::binary);
     shape[0] = pts.size();
     shape[1] = dproj;
     outfile.write(reinterpret_cast<char*>(shape.data()), sizeof(int) * 2);
-    for (const auto& emb : final_embs) {
-        outfile.write(reinterpret_cast<const char*>(emb.data()), sizeof(float) * dproj);
-    }
     outfile.close();
+    // Process points
+    int64_t factor = 10;
+    int64_t batch_size = (pts.size() + factor - 1) / factor;
+    std::vector<std::vector<float>> final_embs(batch_size, std::vector<float>(dproj, 0.0f));
     
+
+    for(size_t j = 0; j < factor ; j++){
+        int32_t left = std::min(pts.size(), size_t( batch_size* (j + 1) )) - batch_size * j;
+        #pragma omp parallel for num_threads(128)
+        for (size_t i = batch_size*j ; i < std::min(pts.size(), size_t(batch_size*(j + 1))); ++i) {
+            process_point(pts[i], down_proj, lsh_partitions, final_embs[i - batch_size*j], d, dproj, query);
+        }
+        std::cout << "Generated " << final_embs.size() << " embs with size " << dproj << " " << j << std::endl;
+        std::string filename;
+        if(query)
+            filename = "./msmarco_query_tiny_muvera.bin";
+        else
+            filename = "./msmarco_base_muvera.bin";
+        std::ofstream outfile(filename, std::ios::binary | std::ios_base::app);
+        
+        for (size_t i = batch_size*j ; i < std::min(pts.size(), size_t(batch_size*(j + 1))); ++i) {
+            auto &emb = final_embs[i - batch_size*j];
+            outfile.write(reinterpret_cast<const char*>(emb.data()), sizeof(float) * dproj);
+        }
+        outfile.close();
+        final_embs.assign(batch_size, std::vector<float>(dproj, 0.0f));
+    }
+    // Save results
     return 0;
 }
 
 void load_data(const std::string& filename, std::vector<std::vector<float>>& pts, std::vector<int>& shape) {
-    std::ifstream file(filename, std::ios::binary);
-    file.read(reinterpret_cast<char*>(shape.data()), sizeof(int) * 2);
+    std::ifstream file_meta_data(filename + ".bin", std::ios::binary);
+    file_meta_data.read(reinterpret_cast<char*>(shape.data()), sizeof(int) * 2);
     
     std::vector<int> psums(shape[0] + 1);
-    file.read(reinterpret_cast<char*>(psums.data()), sizeof(int) * (shape[0] + 1));
-    
-    std::vector<float> data(psums.back() * shape[1]);
-    file.read(reinterpret_cast<char*>(data.data()), sizeof(float) * data.size());
-    file.close();
-    
+    file_meta_data.read(reinterpret_cast<char*>(psums.data() + 1), sizeof(int) * (shape[0]));
     pts.resize(shape[0]);
     for (int i = 0; i < shape[0]; ++i) {
-        pts[i].assign(data.begin() + psums[i] * shape[1], data.begin() + psums[i+1] * shape[1]);
+        pts[i].resize(psums[i+1] * (1LL* shape[1]) - psums[i] * (1LL* shape[1]));
+        file_meta_data.read(reinterpret_cast<char*>(pts[i].data()), sizeof(float) * pts[i].size());
     }
+    file_meta_data.close();
 }
 
 void generate_down_proj(std::vector<float>& down_proj, int rows, int cols) {
     std::mt19937 gen(42);
     std::uniform_int_distribution<> dis(0, 1);
     
-    #pragma omp parallel
-    for (int i = 0; i < rows * cols; ++i) {
+    for (long long i = 0; i < (1ll * rows) * cols; ++i) {
         down_proj[i] = dis(gen) == 0 ? -1.0f : 1.0f;
     }
 }
@@ -111,7 +128,7 @@ void generate_lsh_partitions(std::vector<std::vector<float>>& lsh_partitions, in
 
 void process_point(const std::vector<float>& pt, const std::vector<float>& down_proj, 
                    const std::vector<std::vector<float>>& lsh_partitions, std::vector<float>& final_emb, 
-                   int d, int dproj, bool query) {
+                   int d, long long dproj, bool query) {
     size_t num_curr_vecs = pt.size() / d;
     std::vector<float> codes(num_curr_vecs * nbits); // pt.size() / d = num vecs in pt
     std::vector<int> a(nbits);
@@ -124,20 +141,15 @@ void process_point(const std::vector<float>& pt, const std::vector<float>& down_
         cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
                     num_curr_vecs, nbits, d,
                     1.0f, pt.data(), d,
-                    lsh_partitions[i].data(), nbits, 
+                    lsh_partitions[i].data(), d,
                     0.0f, codes.data(), nbits);
-        
-        // converte the dotproducts into bitstrings
-        for (float& code : codes) {
-            code = code > 0 ? 1.0f : 0.0f;
-        }
-        
+
         // convert bitstrings into plain numbers
         std::vector<int> bucket_codes(num_curr_vecs);
-        for (size_t j = 0; j < codes.size(); ++j) {
+        for (long long j = 0; j < num_curr_vecs ; ++j) {
             int code = 0;
             for (int k = 0; k < nbits; ++k) {
-                code += static_cast<int>(codes[j * nbits + k]) * a[k];
+                code += (codes[j * nbits + k] > 0) * a[k];
             }
             bucket_codes[j] = code;
         }

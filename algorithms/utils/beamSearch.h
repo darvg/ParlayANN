@@ -145,7 +145,7 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
   int32_t kill_counter = 0;
   int32_t last_remain  = 0;
 
-  while (remain > 0 && num_visited < QP.limit) {
+  while (remain > 0 && num_visited < QP.limit ) {
     // the next node to visit is the unvisited frontier node that is closest to
     // p
     std::pair<indexType, distanceType> current = unvisited_frontier[0];

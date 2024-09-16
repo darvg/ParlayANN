@@ -217,8 +217,8 @@ int main(int argc, char *argv[]) {
         using Point = Quantized_Mips_Point<QT>;
         using PR = PointRange<QT, Point>;
         PR Points_(Points);
-        PR Query_Points_(Query_Points, Points_.params);
-        timeNeighbors<Point, PR, uint>(G, Query_Points_, k, BP, oFile, GT,
+	 PR Query_Points_(Query_Points, Points_.params);
+	timeNeighbors<Point, PR, uint>(G, Query_Points_, k, BP, oFile, GT,
                                        rFile, graph_built, Points_);
       } else {
         using Point = Mips_Point<float>;
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
         G = Graph<unsigned int>(gFile);
       using Point = Chamfer_Point<Mips_Point<float>>;
       using PR = ChamferPointRange<float, Point>;
-      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, rFile,
+      timeNeighbors<Point, PR, uint>(G, Query_Points, k, BP, oFile, GT, oFile,
                                      graph_built, Points);
     }
   } else if (tp == "uint8") {
