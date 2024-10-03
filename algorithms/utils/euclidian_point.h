@@ -195,6 +195,7 @@ struct Euclidian_Point {
   parameters params;
   T val;
 
+  void randomize(){}
 private:
   T *values;
   long id_;

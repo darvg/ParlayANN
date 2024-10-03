@@ -143,6 +143,7 @@ template <typename T_, class Point_> struct PointRange {
 
   parameters params;
 
+  void randomize(){}
 private:
   std::shared_ptr<T[]> values;
   unsigned int dims;

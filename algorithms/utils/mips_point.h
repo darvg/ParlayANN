@@ -128,6 +128,7 @@ template <typename T> struct Mips_Point {
 
   T val;
 
+  void randomize(){}
 private:
   T *values;
   long id_;
@@ -245,6 +246,8 @@ struct Quantized_Mips_Point {
               << ", max value = " << max_val << std::endl;
     return parameters(bound, dims);
   }
+
+  void randomize(){}
 
 private:
   T *values;

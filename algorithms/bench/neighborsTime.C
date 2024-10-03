@@ -50,6 +50,7 @@ template <typename Point, typename PointRange, typename indexType>
 void timeNeighbors(Graph<indexType> &G, PointRange &Query_Points, long k,
                    BuildParams &BP, char *outFile, groundTruth<indexType> GT,
                    char *res_file, bool graph_built, PointRange &Points) {
+  Query_Points.randomize();
   time_loop(
       1, 0, [&]() {},
       [&]() {

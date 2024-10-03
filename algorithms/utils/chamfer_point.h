@@ -55,10 +55,17 @@ template <class Point_> struct Chamfer_Point {
     return  distance_impl(x);
 #endif
   }
-  inline float distance_impl(const Chamfer_Point<Point_> &x) const {
+  float distance_impl(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
+    float factor = 1;
     int x_num_vecs = x.params.num_vectors;
+#ifndef CHAMFER_SAMPLING
     int curr_num_vecs = params.num_vectors;
+#elif
+    constexpr int32_t sampling_count = 50;
+    factor = (1.0 * params.num_vectors) / std::min(params.num_vectors, sampling_count);
+    int curr_num_vecs = std::min(params.num_vectors, sampling_count);
+#endif
     int curr_dim = params.dims;
     float return_dist1 = 0.;
 
@@ -76,11 +83,15 @@ template <class Point_> struct Chamfer_Point {
       raise("Not implemented");
     }
 
-    return return_dist1;
+    return return_dist1 * factor;
   }
 
   void prefetch() const {
+#ifndef CHAMFER_SAMPLING
     int l = (params.dims * params.num_vectors * sizeof(T) - 1) / 64 + 1;
+#else
+    int l = (params.dims * std::min(params.num_vectors, sampling_count) * sizeof(T) - 1) / 64 + 1;
+#endif
     for (int i = 0; i < l; i++)
       __builtin_prefetch((char *)values + i * 64);
   }
@@ -130,8 +141,48 @@ template <class Point_> struct Chamfer_Point {
     return parameters(pr.dimension(), num_vectors);
   }
 
+  void randomize(){
+    std::mt19937 rng(id);
+
+    std::vector <int32_t> permutation (params.num_vectors);
+    std::vector <int32_t> rpermutation (params.num_vectors);
+	  std::vector <int32_t> cpermutation (params.num_vectors);
+
+    for(int i = 0; i < params.num_vectors; i++)
+      permutation[i] = rpermutation[i] = cpermutation[i] = i;
+    
+    std::shuffle(permutation.begin(), permutation.end(), rng);
+
+    for(int i = 0; i < params.num_vectors; i++){
+
+	    int32_t location_to_swap_with = rpermutation[permutation[i]];
+
+      if(location_to_swap_with == i) continue;
+
+	    auto swap_memory_location = [](void* const a, void* const b, const size_t n ){
+  		  unsigned char* p;
+  		  unsigned char* q;
+  		  unsigned char* const sentry = (unsigned char*)a + n;
+  		  for ( p = (unsigned char*)a, q = (unsigned char*)b; p < sentry; ++p, ++q ) {
+     			const unsigned char t = *p;
+     			*p = *q;
+     			*q = t;
+  		  }
+	    };
+
+ 	    int32_t vector_size = params.dims;
+	    swap_memory_location(values + i * vector_size , values + location_to_swap_with * vector_size, vector_size);
+
+	    rpermutation[cpermutation[i]] = location_to_swap_with;
+	    rpermutation[cpermutation[location_to_swap_with]] = i;
+	    std::swap(cpermutation[i], cpermutation[location_to_swap_with]);
+    }
+  }
 private:
   T *values;
   long id_;
   parameters params;
+#ifdef CHAMFER_SAMPLING
+  constexpr int32_t sampling_count = 50;
+#endif
 };
