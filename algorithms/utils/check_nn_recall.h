@@ -192,7 +192,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {100};
+  beams = {10,20,50,80,100,110,120,130,140,150,160,170,180,190,200,210,220,240,260,280,300,330,360,390,420,450,480,500};
   if (k == 0)
     allr = {10};
   else

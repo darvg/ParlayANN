@@ -38,6 +38,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "mkl.h"
+
 // *************************************************************
 //  TIMING
 // *************************************************************
@@ -51,17 +53,18 @@ void timeNeighbors(Graph<indexType> &G, PointRange &Query_Points, long k,
   time_loop(
       1, 0, [&]() {},
       [&]() {
-        ANN<Point, PointRange, indexType>(G, k, BP, Query_Points, GT, res_file,
-                                          graph_built, Points);
+        if(graph_built)
+          ANN<Point, PointRange, indexType>(G, k, BP, Query_Points, GT, res_file,
+                                            graph_built, Points);
+        else
+          ANN<Point, PointRange, indexType>(G, k, BP, Query_Points, GT, out_file,
+                                            graph_built, Points);          
       },
       [&]() {});
-
-  if (outFile != NULL) {
-    G.save(outFile);
-  }
 }
 
 int main(int argc, char *argv[]) {
+  mkl_set_num_threads(1);
   commandLine P(
       argc, argv,
       "[-a <alpha>] [-d <delta>] [-R <deg>]"

@@ -188,7 +188,7 @@ struct logger {
 
 template<typename T, size_t width, size_t threads = 192>
 struct buffer {
-    T data[width * threads];
+    T data[width * threads * 8];
 
     buffer() {
         std::fill(data, data + width * threads, (T)0);

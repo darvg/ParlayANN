@@ -31,7 +31,6 @@ template <class Point_> struct Chamfer_Point {
   // "Float types are NOT allowed here!");
   using T = decltype(Point_::val);
   using distanceType = float;
-  // template<typename C, typename range> friend struct Quantized_Mips_Point;
 
   struct parameters {
     int dims;
@@ -47,28 +46,22 @@ template <class Point_> struct Chamfer_Point {
   T operator[](long i) const {
     return *(values + i);
   } // I feel like this should probably return the ith vector
-
   float distance(const Chamfer_Point<Point_> &x) const {
+#ifdef INVERT_CHAMFER
+    return x.distance_impl(this*);
+#elif defined SUM_CHAMFER
+    return x.distance_impl(this*) + distance_impl(x);
+#else
+    return  distance_impl(x);
+#endif
+  }
+  inline float distance_impl(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
     int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
     int curr_dim = params.dims;
     float return_dist1 = 0.;
-    // for (int i = 0; i < curr_num_vecs; i++) {
-    //   T *curr_vec = values + i * curr_dim;
-    //   float curr_min = std::numeric_limits<float>::infinity();
-    //   for (int j = 0; j < x_num_vecs; j++) {
-    //     T *x_vec = x.values + j * curr_dim;
-    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
-    //       curr_min =
-    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
-    //     } else {
-    //       curr_min =
-    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec, curr_dim));
-    //     }
-    //   }
-    //   return_dist1 += curr_min;
-    // }
+
     // do a matmul to get pairwise distances
     if constexpr (std::is_same_v<Point_, Mips_Point<float>>) {
       cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, curr_num_vecs,
@@ -83,25 +76,6 @@ template <class Point_> struct Chamfer_Point {
       raise("Not implemented");
     }
 
-    // float return_dist2 = 0;
-    // for (int i = 0; i < x_num_vecs; i++) {
-    //   T *x_vec = x.values + i * curr_dim;
-    //   float curr_min = std::numeric_limits<float>::infinity();
-    //   for (int j = 0; j < curr_num_vecs; j++) {
-    //     T *curr_vec = values + j * curr_dim;
-    //     if constexpr (std::is_same_v<Point_, Mips_Point<T>>) {
-    //       curr_min =
-    //           std::min(curr_min, mips_distance(curr_vec, x_vec, curr_dim));
-    //     } else {
-    //       curr_min =
-    //           std::min(curr_min, euclidian_distance(curr_vec, x_vec,
-    //           curr_dim));
-    //     }
-    //   }
-    //   return_dist2 += curr_min;
-    // }
-    //
-    // return (return_dist1 + return_dist2) / 2;
     return return_dist1;
   }
 
