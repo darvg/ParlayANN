@@ -90,7 +90,8 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
       // std::cout << i << ": ";
       parlay::sequence<int> results_with_ties;
       for (indexType l = 0; l < k; l++) {
-        results_with_ties.push_back(GT.coordinates(i, l));
+        if(GT.coordinates(i, l) < 1e9)
+          results_with_ties.push_back(GT.coordinates(i, l));
       }
       Point qp = Query_Points[i];
       // float last_dist = qp.distance(Base_Points[GT.coordinates(i, k - 1)]);
@@ -113,8 +114,12 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
           numCorrect += 1;
         }
       }
-      if (reported_nbhs.find(results_with_ties[0]) != reported_nbhs.end()) {
-        numCorrect_1_100 += 1;
+      for (indexType l = 0; l < results_with_ties.size(); l++) {
+        if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
+        {
+          numCorrect_1_100 += 1;
+          break;
+        }
       }
     }
     recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
@@ -131,7 +136,7 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
 
   auto stats_ = {QueryStats.dist_stats(), QueryStats.visited_stats()};
   parlay::sequence<indexType> stats = parlay::flatten(stats_);
-  nn_result N(recall, stats, QPS, k, QP.beamSize, QP.cut, Query_Points.size(),
+  nn_result N(recall, recall_1_100, stats, QPS, k, QP.beamSize, QP.cut, Query_Points.size(),
               QP.limit, QP.degree_limit, k);
   return N;
 }
@@ -194,7 +199,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {10,20,50,80,100,110,120,130,140,150,160,170,180,190,200,210,220,240,260,280,300,330,360,390,420,450,480,500};
+  beams = {10,20,50,80,100};
   if (k == 0)
     allr = {10};
   else
@@ -206,12 +211,10 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
       QP.cut = cut;
       for (float Q : beams) {
         QP.k = QP.beamSize = Q;
-        if (Q >= r) {
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(
                   G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
                   GT, random, start_point, r, QP, verbose));
-        }
       }
     }
     for (auto result : results) {

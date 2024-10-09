@@ -142,9 +142,10 @@ struct nn_result {
 
   long num_queries;
 
-  nn_result(double r, parlay::sequence<uint> stats, float qps, int K, int Q,
+  nn_result(double r, double r_1, parlay::sequence<uint> stats, float qps, int K, int Q,
             float c, long q, int limit, int degree_limit, int gtn)
       : recall(r),
+        recall_1_100(r_1),
         QPS(qps),
         k(K),
         beamQ(Q),
