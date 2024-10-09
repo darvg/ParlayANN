@@ -123,6 +123,7 @@ struct range_result {
 
 struct nn_result {
   double recall;
+  double recall_1_100;
 
   uint avg_cmps;
   uint tail_cmps;
@@ -161,7 +162,7 @@ struct nn_result {
   }
 
   void print() {
-    std::cout << "For " << gtn << "@" << gtn << " recall = " << recall
+    std::cout << "For " << gtn << "@" << beamQ << " recall = " << recall << ", recall 1@" << beamQ << " = " << recall_1_100
               << ", QPS = " << QPS << ", Q = " << beamQ << ", cut = " << cut;
     std::cout << ", visited limit = " << limit << ", degree limit: " << degree_limit;
     std::cout << ", average visited = " << avg_visited << ", average cmps = " << avg_cmps << std::endl;

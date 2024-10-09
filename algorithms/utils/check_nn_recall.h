@@ -64,6 +64,7 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
   query_time = t.next_time();
 
   float recall = 0.0;
+  float recall_1_100 = 0.0;
   // TODO deprecate this after further testing
   bool dists_present = true;
   if (GT.size() > 0 && !dists_present) {
@@ -84,6 +85,7 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
     size_t n = Query_Points.size();
 
     int numCorrect = 0;
+    int numCorrect_1_100 = 0;
     for (indexType i = 0; i < n; i++) {
       // std::cout << i << ": ";
       parlay::sequence<int> results_with_ties;
@@ -100,23 +102,23 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
       //   }
       // }
       std::set<int> reported_nbhs;
-      for (indexType l = 0; l < k; l++) {
+      for (indexType l = 0; l < QP.beamSize; l++) {
         reported_nbhs.insert((all_ngh[i])[l]);
         // std::cout << all_ngh[i][l] << " ";
       }
       // std::cout << results_with_ties[0] << std::endl;
-      // for (indexType l = 0; l < results_with_ties.size(); l++) {
-      //   if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
-      //   {
-      //     numCorrect += 1;
-      //   }
-      // }
+      for (indexType l = 0; l < results_with_ties.size(); l++) {
+        if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
+        {
+          numCorrect += 1;
+        }
+      }
       if (reported_nbhs.find(results_with_ties[0]) != reported_nbhs.end()) {
-        numCorrect += 1;
+        numCorrect_1_100 += 1;
       }
     }
-    // recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
-    recall = static_cast<float>(numCorrect) / static_cast<float>(1 * n);
+    recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
+    recall_1_100 = static_cast<float>(numCorrect_1_100) / static_cast<float>(1 * n);
   }
   float QPS = Query_Points.size() / query_time;
   if (verbose)
@@ -200,13 +202,11 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   cuts = {500};
   for (long r : allr) {
     results.clear();
-    QP.k = r;
     for (float cut : cuts) {
       QP.cut = cut;
       for (float Q : beams) {
-        QP.beamSize = Q;
+        QP.k = QP.beamSize = Q;
         if (Q >= r) {
-          std::cout << "test" << std::endl;
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(
                   G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
