@@ -107,6 +107,19 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
         reported_nbhs.insert((all_ngh[i])[l]);
         // std::cout << all_ngh[i][l] << " ";
       }
+      // for (auto i:reported_nbhs){
+      //   std::cout<<i<<" ";
+      // } std::cout<<"\n";
+      // for (auto j:reported_nbhs){
+      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<" ";
+      // } std::cout<<"\n";
+      // for (auto i:results_with_ties){
+      //   std::cout<<i<<" ";
+      // } std::cout<<"\n";
+      // for (auto j:results_with_ties){
+      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<" ";
+      // } std::cout<<"\n";
+      // exit(0);
       // std::cout << results_with_ties[0] << std::endl;
       for (indexType l = 0; l < results_with_ties.size(); l++) {
         if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
@@ -199,7 +212,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {10,20,50,80,100};
+  beams = {100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250};
   if (k == 0)
     allr = {10};
   else
@@ -210,7 +223,8 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
     for (float cut : cuts) {
       QP.cut = cut;
       for (float Q : beams) {
-        QP.k = QP.beamSize = Q;
+        QP.k = 100;
+        QP.beamSize = Q;
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(
                   G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
