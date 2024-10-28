@@ -103,7 +103,7 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
       //   }
       // }
       std::set<int> reported_nbhs;
-      for (indexType l = 0; l < QP.beamSize; l++) {
+      for (indexType l = 0; l < QP.k; l++) {
         reported_nbhs.insert((all_ngh[i])[l]);
         // std::cout << all_ngh[i][l] << " ";
       }

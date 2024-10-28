@@ -163,7 +163,7 @@ struct nn_result {
   }
 
   void print() {
-    std::cout << "For " << gtn << "@" << beamQ << " recall = " << recall << ", recall 1@" << beamQ << " = " << recall_1_100
+    std::cout << "For " << gtn << "@" << std::min(beamQ,100) << " recall = " << recall << ", recall 1@" << std::min(beamQ,100) << " = " << recall_1_100
               << ", QPS = " << QPS << ", Q = " << beamQ << ", cut = " << cut;
     std::cout << ", visited limit = " << limit << ", degree limit: " << degree_limit;
     std::cout << ", average visited = " << avg_visited << ", average cmps = " << avg_cmps << std::endl;
