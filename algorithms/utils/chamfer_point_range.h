@@ -173,7 +173,7 @@ template <typename T_, class Point_> struct ChamferPointRange {
   void randomize(){
 #ifdef CHAMFER_SAMPLING
     for(int id = 0; id < n; id++)
-      (this*)[id].randomize();
+      (*this)[id].randomize();
 #endif
   }
 

@@ -8,6 +8,7 @@
 #include <random>
 #include <locale>
 #include <chrono>
+#include "mkl.h"
 // #include "utils/types.h"
 #include "utils/chamfer_point.h"
 #include "utils/chamfer_point_range.h"
@@ -20,7 +21,7 @@ using pid = std::pair<int, float>;
 
 template <typename PointRange>
 parlay::sequence<parlay::sequence<pid>>
-compute_groundtruth(PointRange &B, PointRange &Q, int k) {
+compute_groundtruth(PointRange &B, PointRange &Q, int k,size_t l = 0,size_t r = 0) {
   unsigned d = B.dimension();
   size_t q = Q.size();
   size_t b = B.size();
@@ -33,7 +34,7 @@ compute_groundtruth(PointRange &B, PointRange &Q, int k) {
     float topdist = B[0].d_min();
     int toppos;
     parlay::sequence<pid> topk;
-    for (size_t j = 0; j < b; j++) {
+    for (size_t j = l; j < std::min(b, r); j++) {
       // float dist = D->distance((Q[i].coordinates).begin(),
       // (B[j].coordinates).begin(), d);
       float dist = Q[i].distance(B[j]);
@@ -125,6 +126,7 @@ void write_ibin(parlay::sequence<parlay::sequence<pid>> &result,
 }
 
 int main(int argc, char *argv[]) {
+  mkl_set_num_threads(1);
   // setting locale for number formatting
   std::locale::global(std::locale("en_US.utf8"));
   std::cout.imbue(std::locale());
@@ -186,9 +188,49 @@ int main(int argc, char *argv[]) {
           bFile);
       auto Q = ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>(
           qFile);
-      answers = compute_groundtruth<
-          ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>>(B, Q,
-                                                                           k);
+      constexpr size_t batch_size = 10000;
+      for(int batch = 0; batch * batch_size < B.size(); batch++){
+        std::cout<< "Processing Batch Number : "<<batch<<std::endl;
+        if(batch == 0)
+          answers = compute_groundtruth<ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>>(B, Q, k, 0, batch_size);
+        else{
+          // write a topk merge function
+          auto local_answers = compute_groundtruth<ChamferPointRange<float, Chamfer_Point<Mips_Point<float>>>>(B, Q, k, batch * batch_size, batch * batch_size + batch_size);
+          auto merge_topk = [&](int index){
+
+            float topdist = answers[index][0].second;
+            int toppos = 0;
+
+            for(int i = 0; i < std::min((size_t)k, (size_t)local_answers[index].size()); i++){
+              if(topdist < answers[index][i].second){
+                topdist = answers[index][i].second;
+                toppos  = i;
+              }
+            }
+
+            for(int i = 0; i < std::min((size_t)k, (size_t)local_answers[index].size()); i++){
+              auto dist = local_answers[index][i].second;
+              auto j    = local_answers[index][i].first;
+              if (dist < topdist) {
+                float new_topdist = B[0].d_min();
+                int new_toppos = 0;
+                answers[index][toppos] = std::make_pair((int)j, dist);
+                for (size_t l = 0; l < answers[index].size(); l++) {
+                  if (answers[index][l].second > new_topdist) {
+                    new_topdist = answers[index][l].second;
+                    new_toppos = (int)l;
+                  }
+                }
+                topdist = new_topdist;
+                toppos = new_toppos;
+              }
+            }
+          };
+          for(int i = 0; i < Q.size(); i++){
+            merge_topk(i);
+          }
+        }
+      }
     }
   }
   // }else if(tp == "uint8"){

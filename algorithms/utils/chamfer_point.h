@@ -58,13 +58,16 @@ template <class Point_> struct Chamfer_Point {
   float distance_impl(const Chamfer_Point<Point_> &x) const {
     // this distance is asymmetric! we iterate over curr vector.
     float factor = 1;
-    int x_num_vecs = x.params.num_vectors;
 #ifndef CHAMFER_SAMPLING
+    int x_num_vecs = x.params.num_vectors;
     int curr_num_vecs = params.num_vectors;
-#elif
-    constexpr int32_t sampling_count = 50;
+#else
+    int32_t sampling_count = 0.1 * params.num_vectors;
     factor = (1.0 * params.num_vectors) / std::min(params.num_vectors, sampling_count);
     int curr_num_vecs = std::min(params.num_vectors, sampling_count);
+    int x_num_vecs = 0.1 * x.params.num_vectors;
+    x_num_vecs = std::max(x_num_vecs,1);
+    curr_num_vecs = std::max(curr_num_vecs,1);
 #endif
     int curr_dim = params.dims;
     float return_dist1 = 0.;
@@ -90,6 +93,7 @@ template <class Point_> struct Chamfer_Point {
 #ifndef CHAMFER_SAMPLING
     int l = (params.dims * params.num_vectors * sizeof(T) - 1) / 64 + 1;
 #else
+    int32_t sampling_count = 0.1 * params.num_vectors;
     int l = (params.dims * std::min(params.num_vectors, sampling_count) * sizeof(T) - 1) / 64 + 1;
 #endif
     for (int i = 0; i < l; i++)
@@ -142,7 +146,7 @@ template <class Point_> struct Chamfer_Point {
   }
 
   void randomize(){
-    std::mt19937 rng(id);
+    std::mt19937 rng(id_);
 
     std::vector <int32_t> permutation (params.num_vectors);
     std::vector <int32_t> rpermutation (params.num_vectors);
@@ -182,7 +186,4 @@ private:
   T *values;
   long id_;
   parameters params;
-#ifdef CHAMFER_SAMPLING
-  constexpr int32_t sampling_count = 50;
-#endif
 };
