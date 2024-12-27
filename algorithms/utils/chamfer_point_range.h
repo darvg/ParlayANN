@@ -179,7 +179,6 @@ template <typename T_, class Point_> struct ChamferPointRange {
 
   parameters params;
 
-private:
   std::shared_ptr<T[]> values;
   std::shared_ptr<uint32_t[]> prefix_sums;
   uint32_t dims;

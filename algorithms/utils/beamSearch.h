@@ -36,7 +36,134 @@
 #include "parlay/random.h"
 #include "stats.h"
 #include "types.h"
+#include "chamfer_point.h"
+// clustering 
+#ifdef CLUSTER_QUERY_POINTS
+// Function to compute the cosine similarity between two vectors
+template <typename T>
+T cosine_similarity(const T* vec1, const T* vec2, const T norm_vec1, const T norm_vec2, int t) {
+    T dot_product = 0.0;
 
+    for (int i = 0; i < t; ++i) {
+        dot_product += vec1[i] * vec2[i];
+    }
+
+    return dot_product / (norm_vec1 * norm_vec2);
+}
+
+// Compute the norm of a vector
+template <typename T>
+T compute_norm(const T* vec, int t) {
+    T norm = 0.0;
+    for (int i = 0; i < t; ++i) {
+        norm += vec[i] * vec[i];
+    }
+    return std::sqrt(norm);
+}
+
+// Lloyd's Cosine Clustering function
+template <typename T>
+void lloyd_cosine_clustering(T* values, int n, int t, int k) {
+    // Step 1: Initialize k centers (first k vectors from the dataset)
+    std::vector<int> assignments(n, -1);  // To store cluster assignments for each vector
+
+    // To store sums of vectors in each cluster
+    std::vector<T*> cluster_sums(k, nullptr);
+    std::vector<T*> centers(k, nullptr);
+    std::vector<int> cluster_sizes(k, 0);
+    // Precompute the norms of all vectors
+    std::vector<T> norms(n);
+    for (int i = 0; i < n; ++i) {
+        norms[i] = compute_norm(values + i * t, t);
+    }
+    // for(int i = 0; i < n; i++){
+    //   for(int j = 0; j < n; j++){
+    //     std::cout<<cosine_similarity(values + i * t, values + j * t, norms[i], norms[j], t)<<",";
+    //   }
+    //   std::cout<<std::endl;
+    // }
+    // exit(0);
+    // Initializing cluster centers with the first k vectors
+    for (int i = 0; i < k; ++i) {
+        cluster_sums[i] = new T[t]();  // Allocate memory for sums
+        centers[i] = new T[t]();
+        for(int j = 0; j < t; j++){
+          centers[i][j] = values[t*i + j];
+          cluster_sums[i][j] = 0;
+        }
+    }
+
+    bool converged = false;
+    int iter_count = 0;
+    while (!converged) {
+        converged = true;
+        iter_count = iter_count + 1;
+        // Step 2: Assign each vector to the closest center
+        for (int i = 0; i < n; ++i) {
+            T* current_vector = values + i * t;
+            int best_cluster = -1;
+            T best_similarity = -std::numeric_limits<T>::infinity();
+
+            for (int j = 0; j < k; ++j) {
+                T* center = centers[j];
+                T similarity = cosine_similarity(current_vector, center, norms[i], norms[j], t);
+
+                if (similarity > best_similarity) {
+                    best_similarity = similarity;
+                    best_cluster = j;
+                }
+            }
+
+            // If the assignment changes, set converged to false
+            if (assignments[i] != best_cluster) {
+                assignments[i] = best_cluster;
+                converged = false;
+            }
+
+            // Update cluster sums
+            for (int j = 0; j < t; ++j) {
+                cluster_sums[best_cluster][j] += current_vector[j];
+            }
+            cluster_sizes[best_cluster]++;
+        }
+
+        converged |= (iter_count > 10);
+        // Step 3: Recompute the centers by averaging vectors in each cluster
+        for (int i = 0; i < k; ++i) {
+            if (cluster_sizes[i] > 0) {
+                for (int j = 0; j < t; ++j) {
+                    cluster_sums[i][j] /= cluster_sizes[i];
+                    centers[i][j]      = cluster_sums[i][j];
+                }
+                if(converged){
+                  // Replace the center in the values array
+                  for (int j = 0; j < t; ++j) {
+                    values[i * t + j] = cluster_sums[i][j] * cluster_sizes[i];
+                  }
+                }
+            }
+            // Reset for next iteration
+            cluster_sizes[i] = 0;
+            std::fill(cluster_sums[i], cluster_sums[i] + t, 0.0);
+        }
+    }
+    // Cleanup dynamically allocated memory
+    for (int i = 0; i < k; ++i) {
+        delete[] cluster_sums[i];
+        delete[] centers[i];
+    }
+}
+
+template <typename T>
+void caller(T &point, int num_vectors){};
+
+void caller(Chamfer_Point<Mips_Point<float>>* point, int num_vectors){
+  if(point->params.num_vectors > num_vectors){
+    lloyd_cosine_clustering<float>(point->values, point->params.num_vectors, 128, num_vectors);
+    point->params.num_vectors = num_vectors;
+  }
+}
+#endif
 // main beam search
 template <typename indexType, typename Point, typename PointRange, class GT>
 std::pair<
@@ -381,6 +508,10 @@ beam_search_rerank(const Point &p, const QPoint &pq, Graph<indexType> &G,
                    parlay::sequence<indexType> starting_points,
                    QueryParams &QP) {
   // beam search with quantized points
+#ifdef CLUSTER_QUERY_POINTS
+  auto non_const_point_ptr = const_cast<Point*>(&p);
+  caller(non_const_point_ptr, QP.num_clusters);
+#endif
   auto [pairElts, dist_cmps] =
       beam_search(pq, G, Q_Base_Points, starting_points, QP);
   auto [beamElts, visitedElts] = pairElts;

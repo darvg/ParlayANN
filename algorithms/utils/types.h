@@ -211,9 +211,10 @@ struct QueryParams{
   long limit;
   long degree_limit;
   float pad = 1.0;
+  int num_clusters = 1000000;
 
   QueryParams(long k, long Q, double cut, long limit, long dg) : k(k), beamSize(Q), cut(cut), limit(limit), degree_limit(dg) {}
-
+  QueryParams(long k, long Q, double cut, long limit, long dg, int nc) : k(k), beamSize(Q), cut(cut), limit(limit), degree_limit(dg), num_clusters(nc) {}
   QueryParams() {}
 
 };

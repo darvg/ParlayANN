@@ -178,7 +178,7 @@ template <class Point_> struct Chamfer_Point {
 	    std::swap(cpermutation[i], cpermutation[location_to_swap_with]);
     }
   }
-private:
+
   T *values;
   long id_;
   parameters params;

@@ -84,8 +84,8 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
   } else if (GT.size() > 0 && dists_present) {
     size_t n = Query_Points.size();
 
-    int numCorrect = 0;
-    int numCorrect_1_100 = 0;
+    float numCorrect = 0;
+    float numCorrect_1_100 = 0;
     for (indexType i = 0; i < n; i++) {
       // std::cout << i << ": ";
       parlay::sequence<int> results_with_ties;
@@ -108,16 +108,16 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
         // std::cout << all_ngh[i][l] << " ";
       }
       // for (auto i:reported_nbhs){
-      //   std::cout<<i<<" ";
+      //   std::cout<<i<<",";
       // } std::cout<<"\n";
       // for (auto j:reported_nbhs){
-      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<" ";
+      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<",";
       // } std::cout<<"\n";
       // for (auto i:results_with_ties){
-      //   std::cout<<i<<" ";
+      //   std::cout<<i<<",";
       // } std::cout<<"\n";
       // for (auto j:results_with_ties){
-      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<" ";
+      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<",";
       // } std::cout<<"\n";
       // exit(0);
       // std::cout << results_with_ties[0] << std::endl;
@@ -127,13 +127,14 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
           numCorrect += 1;
         }
       }
+      float curr_correct = 0;
       for (indexType l = 0; l < results_with_ties.size(); l++) {
         if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
         {
-          numCorrect_1_100 += 1;
-          break;
+          curr_correct += 1;
         }
       }
+      numCorrect_1_100 += curr_correct/std::min(reported_nbhs.size(),results_with_ties.size());
     }
     recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
     recall_1_100 = static_cast<float>(numCorrect_1_100) / static_cast<float>(1 * n);
@@ -212,12 +213,15 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250};
+  beams = {100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,300,400};
+  // beams = {100};
+  std::vector<int> num_cluster = {1};
   if (k == 0)
     allr = {10};
   else
     allr = {k};
   cuts = {500};
+  for (auto nc : num_cluster){
   for (long r : allr) {
     results.clear();
     for (float cut : cuts) {
@@ -225,12 +229,26 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
       for (float Q : beams) {
         QP.k = 100;
         QP.beamSize = Q;
+        Query_Points.n = 1000;
+        QP.num_clusters = nc;
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(
                   G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
                   GT, random, start_point, r, QP, verbose));
       }
     }
+    for (auto result : results) {
+      std::cout<<result.recall<<",";
+    }
+    std::cout<<std::endl;
+      for (auto result : results) {
+      std::cout<<result.recall_1_100<<",";
+    }
+    std::cout<<std::endl;
+    for (auto result : results) {
+      std::cout<<1/result.QPS<<",";
+    }
+    std::cout<<std::endl;
     for (auto result : results) {
       result.print();
     }
@@ -271,6 +289,8 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
     // std::cout << std::endl;
     // if (res_file != NULL)
     //   write_to_csv(std::string(res_file), ret_buckets, res, G_);
+  }
+  std::cout<<"Results for " << nc << " clusters\n";
   }
 }
 
