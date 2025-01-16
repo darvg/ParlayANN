@@ -77,7 +77,8 @@ template <typename PointRange, typename indexType> struct knn_index {
     // Sort the candidate set according to distance from p
     auto less = [&](pid a, pid b) { return a.second < b.second; };
     std::sort(candidates.begin(), candidates.end(), less);
-
+    // std::mt19937 g(42);
+    // std::shuffle(candidates.begin(), candidates.end(), g);
     // remove any duplicates
     auto new_end =
         std::unique(candidates.begin(), candidates.end(),

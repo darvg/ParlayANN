@@ -78,9 +78,13 @@ template <class Point_> struct Chamfer_Point {
                   x_num_vecs, curr_dim, -1.0, values, curr_dim, x.values,
                   curr_dim, 0.0, chamfer_buffer.get(), x_num_vecs);
       for (int i = 0; i < curr_num_vecs; i++) {
-        return_dist1 += *std::min_element(
+        return_dist1 += (*std::min_element(
             chamfer_buffer.get() + i * x_num_vecs,
-            chamfer_buffer.get() + (i + 1) * x_num_vecs);
+            chamfer_buffer.get() + (i + 1) * x_num_vecs))
+#ifdef WEIGHTED_CHAMFER
+            *  (*(weights + i))
+#endif
+            ;
       }
     } else {
       raise("Not implemented");
@@ -106,6 +110,11 @@ template <class Point_> struct Chamfer_Point {
 
   Chamfer_Point(T *values, long id, parameters params)
       : values(values), id_(id), params(params) {}
+
+#ifdef WEIGHTED_CHAMFER
+   Chamfer_Point(T *values, long id, parameters params, float *weights)
+      : values(values), id_(id), params(params), weights(weights) {} 
+#endif
 
   bool operator==(const Chamfer_Point<Point_> &q) const {
     if (q.params.num_vectors != params.num_vectors) {
@@ -184,6 +193,9 @@ template <class Point_> struct Chamfer_Point {
   }
 
   T *values;
+#ifdef WEIGHTED_CHAMFER
+  float *weights;
+#endif
   long id_;
   parameters params;
 };

@@ -132,25 +132,21 @@ template <typename T_, class Point_> struct ChamferPointRange {
     // madvise(ptr, num_bytes, MADV_HUGEPAGE);
     values = std::shared_ptr<T[]>(ptr, std::default_delete<T[]>());
     reader.read((char *)(values.get()), num_bytes);
-    // size_t BLOCK_SIZE = 1000000;
-    // size_t index = 0;
-    // while (index < n) {
-    //   size_t floor = index;
-    //   size_t ceiling = index + BLOCK_SIZE <= n ? index + BLOCK_SIZE : n;
-    //   T *data_start = new T[(ceiling - floor) * dims];
-    //   reader.read((char *)(data_start), sizeof(T) * (ceiling - floor) *
-    //   dims); T *data_end = data_start + (ceiling - floor) * dims;
-    //   parlay::slice<T *, T *> data = parlay::make_slice(data_start,
-    //   data_end); int data_bytes = dims * sizeof(T);
-    //   parlay::parallel_for(floor, ceiling, [&](size_t i) {
-    //     for (int j = 0; j < dims; j++)
-    //       values.get()[i * aligned_dims + j] = data[(i - floor) * dims + j];
-    //     // std::memmove(values.get() + i*aligned_dims, data.begin() +
-    //     // (i-floor)*dims, data_bytes);
-    //   });
-    //   delete[] data_start;
-    //   index = ceiling;
-    // }
+
+#ifdef WEIGHTED_CHAMFER
+    int32_t num_vectors = prefix_sums[num_points];
+    weights = std::shared_ptr<float[]>(
+        new float[num_vectors], std::default_delete<float[]>());
+
+    std::vector<float> weights_vec(num_vectors);
+    for (int i = 0; i < num_vectors; i++) {
+      float tmp;
+      reader_position = reader.tellg();
+      reader.read((char *)(&tmp), sizeof(float));
+      weights_vec[i] = tmp;
+    }
+    memcpy(weights.get(), weights_vec.data(),sizeof(float) * (num_vectors));
+#endif
   }
 
   size_t size() const { return n; }
@@ -166,7 +162,11 @@ template <typename T_, class Point_> struct ChamferPointRange {
     int num_vectors = prefix_sums[i + 1] - prefix_sums[i];
     auto x = Point(values.get() + (1LL * prefix_sums[i]) * (1LL * dims), i,
                    typename ChamferPointRange<T_, Point_>::Point::parameters(
-                       dims, num_vectors));
+                       dims, num_vectors)
+#ifdef WEIGHTED_CHAMFER
+                      , weights.get() + (1LL * prefix_sums[i])
+#endif
+                      );
     return x;
   }
 
@@ -182,6 +182,9 @@ template <typename T_, class Point_> struct ChamferPointRange {
 
   std::shared_ptr<T[]> values;
   std::shared_ptr<uint32_t[]> prefix_sums;
+#ifdef WEIGHTED_CHAMFER
+  std::shared_ptr<float[]> weights;
+#endif
   uint32_t dims;
   size_t n;
 };
