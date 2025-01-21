@@ -46,16 +46,16 @@ template <class Point_> struct Chamfer_Point {
   T operator[](long i) const {
     return *(values + i);
   } // I feel like this should probably return the ith vector
-  float distance(const Chamfer_Point<Point_> &x) const {
+  float distance(const Chamfer_Point<Point_> &x, bool flag = false) const {
 #ifdef INVERT_CHAMFER
-    return x.distance_impl(this*);
+    return x.distance_impl(this*,flag);
 #elif defined SUM_CHAMFER
-    return x.distance_impl(this*) + distance_impl(x);
+    return x.distance_impl(this*,flag) + distance_impl(x,flag);
 #else
-    return  distance_impl(x);
+    return  distance_impl(x,flag);
 #endif
   }
-  float distance_impl(const Chamfer_Point<Point_> &x) const {
+  float distance_impl(const Chamfer_Point<Point_> &x, bool flag = false) const {
     // this distance is asymmetric! we iterate over curr vector.
     float factor = 1;
 #ifndef CHAMFER_SAMPLING
@@ -78,13 +78,16 @@ template <class Point_> struct Chamfer_Point {
                   x_num_vecs, curr_dim, -1.0, values, curr_dim, x.values,
                   curr_dim, 0.0, chamfer_buffer.get(), x_num_vecs);
       for (int i = 0; i < curr_num_vecs; i++) {
+        auto t = 1;
+#ifdef WEIGHTED_CHAMFER
+#ifdef BIMETRIC_CONVERGENCE
+        if(flag)
+#endif
+          t = (*(weights + i));
+#endif
         return_dist1 += (*std::min_element(
             chamfer_buffer.get() + i * x_num_vecs,
-            chamfer_buffer.get() + (i + 1) * x_num_vecs))
-#ifdef WEIGHTED_CHAMFER
-            *  (*(weights + i))
-#endif
-            ;
+            chamfer_buffer.get() + (i + 1) * x_num_vecs))* t;
       }
     } else {
       raise("Not implemented");

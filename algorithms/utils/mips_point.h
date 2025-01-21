@@ -76,7 +76,7 @@ template <typename T> struct Mips_Point {
   static bool is_metric() { return false; }
   T operator[](long i) const { return *(values + i); }
 
-  float distance(const Mips_Point<T> &x) const {
+  float distance(const Mips_Point<T> &x, bool flag = false) const {
     return mips_distance(this->values, x.values, params.dims);
   }
 
@@ -169,7 +169,7 @@ struct Quantized_Mips_Point {
     return (float)-result;
   }
 
-  float distance(const Quantized_Mips_Point &x) const {
+  float distance(const Quantized_Mips_Point &x, bool flag = false) const {
     return distance(this->values, x.values);
   }
 

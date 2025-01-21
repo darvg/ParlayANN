@@ -184,7 +184,7 @@ beam_search(Point p, Graph<indexType> &G, PointRange &Points,
             indexType starting_point, QueryParams &QP) {
 
   parlay::sequence<indexType> start_points = {starting_point};
-  return beam_search_impl<indexType>(p, G, Points, start_points, QP);
+  return beam_search_impl<indexType>(p, G, Points, start_points, QP, false);
 }
 
 template <typename Point, typename PointRange, typename indexType>
@@ -195,7 +195,7 @@ std::pair<
     size_t>
 beam_search(Point p, Graph<indexType> &G, PointRange &Points,
             parlay::sequence<indexType> starting_points, QueryParams &QP) {
-  return beam_search_impl<indexType>(p, G, Points, starting_points, QP);
+  return beam_search_impl<indexType>(p, G, Points, starting_points, QP, false);
 }
 
 // main beam search
@@ -206,7 +206,7 @@ std::pair<
         parlay::sequence<std::pair<indexType, typename Point::distanceType>>>,
     size_t>
 beam_search_impl(Point p, GT &G, PointRange &Points,
-                 parlay::sequence<indexType> starting_points, QueryParams &QP) {
+                 parlay::sequence<indexType> starting_points, QueryParams &QP, bool converged_once = false) {
   if (starting_points.size() == 0) {
     std::cout << "beam search expects at least one start point" << std::endl;
     abort();
@@ -301,7 +301,8 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
                                ? (distanceType)std::numeric_limits<int>::max()
                                : frontier[frontier.size() - 1].second);
     for (auto a : keep) {
-      distanceType dist = p.distance(Points[a]);
+      distanceType dist;
+      dist = p.distance(Points[a],converged_once);
       dist_cmps++;
       // skip if frontier not full and distance too large
       if (dist >= cutoff)
@@ -342,10 +343,20 @@ beam_search_impl(Point p, GT &G, PointRange &Points,
                             visited.end(), unvisited_frontier.begin(), less) -
         unvisited_frontier.begin();
   }
-
-  return std::make_pair(std::make_pair(parlay::to_sequence(frontier),
+#ifdef BIMETRIC_CONVERGENCE
+  if(converged_once)
+#endif
+    return std::make_pair(std::make_pair(parlay::to_sequence(frontier),
                                        parlay::to_sequence(visited)),
                         dist_cmps);
+#ifdef BIMETRIC_CONVERGENCE
+  else{
+    parlay::sequence<indexType> new_starting_points;
+    for(auto &i:frontier)
+      new_starting_points.push_back(i.first);
+    return beam_search_impl(p, G, Points, new_starting_points, QP, true);
+  }
+#endif
 }
 
 // a range search that first finds a close point using a beam search,
