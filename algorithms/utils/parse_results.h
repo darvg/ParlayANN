@@ -139,11 +139,20 @@ struct nn_result {
   int limit;
   int degree_limit;
   int gtn;
-
+  float ndcg;
+  float max_max_approximation;
+  float max_mean_approximation;
+  float max_avg_approximation;
+  float mean_max_approximation;
+  float mean_mean_approximation;
+  float mean_avg_approximation;
   long num_queries;
 
   nn_result(double r, double r_1, parlay::sequence<uint> stats, float qps, int K, int Q,
-            float c, long q, int limit, int degree_limit, int gtn)
+            float c, long q, int limit, int degree_limit, int gtn, float ndcg, float  max_max_approximation,
+            float max_mean_approximation, float max_avg_approximation,
+            float mean_max_approximation, float mean_mean_approximation,
+            float mean_avg_approximation)
       : recall(r),
         recall_1_100(r_1),
         QPS(qps),
@@ -153,7 +162,14 @@ struct nn_result {
         limit(limit),
         degree_limit(degree_limit),
         gtn(gtn),
-        num_queries(q) {
+        num_queries(q) 
+        , ndcg(ndcg),
+        max_max_approximation(max_max_approximation),
+        max_mean_approximation(max_mean_approximation),
+        max_avg_approximation(max_avg_approximation),
+        mean_max_approximation(mean_max_approximation),
+        mean_mean_approximation(mean_mean_approximation),
+        mean_avg_approximation(mean_avg_approximation) {
     if (stats.size() != 4) abort();
 
     avg_cmps = stats[0];
@@ -163,8 +179,14 @@ struct nn_result {
   }
 
   void print() {
-    std::cout << "For " << gtn << "@" << std::min(beamQ,100) << " recall = " << recall << ", recall 1@" << std::min(beamQ,100) << " = " << recall_1_100
-              << ", QPS = " << QPS << ", Q = " << beamQ << ", cut = " << cut;
+    std::cout << "For " << gtn << "@" << beamQ << " recall = " << recall << ", recall 1@" << std::min(beamQ,100) << " = " << recall_1_100
+              << ", QPS = " << QPS << ", Latency = " << 1/QPS << ", ndcg = " << ndcg <<", max_max_approximation = " << max_max_approximation
+              << ", max_mean_approximation = " << max_mean_approximation
+              << ", max_avg_approximation = " << max_avg_approximation
+              << ", mean_max_approximation = " << mean_max_approximation
+              << ", mean_mean_approximation = " << mean_mean_approximation
+              << ", mean_avg_approximation = " << mean_avg_approximation
+              << ", Q = " << beamQ << ", cut = " << cut;
     std::cout << ", visited limit = " << limit << ", degree limit: " << degree_limit;
     std::cout << ", average visited = " << avg_visited << ", average cmps = " << avg_cmps << std::endl;
   }

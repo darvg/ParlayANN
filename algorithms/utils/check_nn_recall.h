@@ -65,6 +65,13 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
 
   float recall = 0.0;
   float recall_1_100 = 0.0;
+  float ndcg = 0.0;
+  float max_max_approximation = 0.0;
+  float max_mean_approximation = 0.0;
+  float max_avg_approximation = 0.0;
+  float mean_max_approximation = 0.0;
+  float mean_mean_approximation = 0.0;
+  float mean_avg_approximation = 0.0;
   // TODO deprecate this after further testing
   bool dists_present = true;
   if (GT.size() > 0 && !dists_present) {
@@ -86,41 +93,74 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
 
     float numCorrect = 0;
     float numCorrect_1_100 = 0;
+
     for (indexType i = 0; i < n; i++) {
-      // std::cout << i << ": ";
+      float mean_approx = 0.0;
+      float max_approx = 0.0;
+      float avg_approx_num = 0.0;
+      float avg_approx_den = 0.0;
+      float avg_approx = 0.0;
       parlay::sequence<int> results_with_ties;
       for (indexType l = 0; l < k; l++) {
         if(GT.coordinates(i, l) < 1e9)
           results_with_ties.push_back(GT.coordinates(i, l));
       }
       Point qp = Query_Points[i];
-      // float last_dist = qp.distance(Base_Points[GT.coordinates(i, k - 1)]);
-      // float last_dist = GT.distances(i, k-1);
-      // for (indexType l = k; l < GT.dimension(); l++) {
-      //   // if (GT.distances(i,l) == last_dist) {
-      //   if (qp.distance(Base_Points[GT.coordinates(i, l)]) == last_dist) {
-      //     results_with_ties.push_back(GT.coordinates(i, l));
-      //   }
-      // }
       std::set<int> reported_nbhs;
+      // create 2 vector of sorted points in all_ngh[i] by their distance to q, and points in GT.coordinates(i,l)
+      // Calculate the maximum, mean, and average of the ratio of distances 
+      // between corresponding elements in two sorted vectors:
+      // 1. Sort the points in all_ngh[i] based on their distance to the query point qp.
+      // 2. Sort the points in GT.coordinates(i, l) similarly.
+      // 3. Compute the ratio of distances for each index and calculate the max, mean, and avg of sums.
+      // This helps evaluate the quality of the nearest neighbor approximation.
+
+      // Sort the points in all_ngh[i] based on their distance to the query point qp.
+      std::vector<std::pair<float, indexType>> sorted_ngh;
+      for (indexType l = 0; l < QP.k; l++) {
+        float dist = qp.distance(Base_Points[(all_ngh[i])[l]]);
+        sorted_ngh.push_back(std::make_pair(dist, (all_ngh[i])[l]));
+      }
+      std::sort(sorted_ngh.begin(), sorted_ngh.end(),
+                [](const std::pair<float, indexType> &a,
+                   const std::pair<float, indexType> &b) {
+                  return a.first < b.first;
+                });
+      // Sort the points in GT.coordinates(i, l) similarly.
+      std::vector<std::pair<float, indexType>> sorted_gt;
+      for (indexType l = 0; l < results_with_ties.size(); l++) {
+        float dist = qp.distance(Base_Points[results_with_ties[l]]);
+        sorted_gt.push_back(std::make_pair(dist, results_with_ties[l]));
+      }
+      std::sort(sorted_gt.begin(), sorted_gt.end(),
+                [](const std::pair<float, indexType> &a,
+                   const std::pair<float, indexType> &b) {
+                  return a.first < b.first;
+                });
+      // Calculate the maximum, mean, and average of the ratio of distances
+      // between corresponding elements in two sorted vectors:
+      for (indexType l = 0; l < sorted_ngh.size(); l++) {
+        float dist_ngh = sorted_ngh[l].first;
+        float dist_gt = sorted_gt[l].first;
+        if (dist_gt > 0) {
+          float ratio = dist_ngh / dist_gt;
+          max_approx = std::max(max_approx, ratio);
+          mean_approx += ratio;
+          avg_approx_num += dist_ngh;
+          avg_approx_den += dist_gt;
+        }
+      }
+      mean_approx /= sorted_ngh.size();
+      avg_approx   = avg_approx_num / avg_approx_den;
+      max_max_approximation = std::max(max_max_approximation, max_approx);
+      max_mean_approximation = std::max(max_mean_approximation, mean_approx);
+      max_avg_approximation = std::max(max_avg_approximation, avg_approx);
+      mean_max_approximation  += max_approx;
+      mean_mean_approximation += mean_approx;
+      mean_avg_approximation  += avg_approx;
       for (indexType l = 0; l < QP.k; l++) {
         reported_nbhs.insert((all_ngh[i])[l]);
-        // std::cout << all_ngh[i][l] << " ";
       }
-      // for (auto i:reported_nbhs){
-      //   std::cout<<i<<",";
-      // } std::cout<<"\n";
-      // for (auto j:reported_nbhs){
-      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<",";
-      // } std::cout<<"\n";
-      // for (auto i:results_with_ties){
-      //   std::cout<<i<<",";
-      // } std::cout<<"\n";
-      // for (auto j:results_with_ties){
-      //   std::cout<<Query_Points[i].distance(Base_Points[j])<<",";
-      // } std::cout<<"\n";
-      // exit(0);
-      // std::cout << results_with_ties[0] << std::endl;
       for (indexType l = 0; l < results_with_ties.size(); l++) {
         if (reported_nbhs.find(results_with_ties[l]) != reported_nbhs.end())
         {
@@ -138,6 +178,9 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
     }
     recall = static_cast<float>(numCorrect) / static_cast<float>(k * n);
     recall_1_100 = static_cast<float>(numCorrect_1_100) / static_cast<float>(1 * n);
+    mean_max_approximation  /= n;
+    mean_mean_approximation /= n;
+    mean_avg_approximation  /= n;
   }
   float QPS = Query_Points.size() / query_time;
   if (verbose)
@@ -151,7 +194,10 @@ nn_result checkRecall(Graph<indexType> &G, PointRange &Base_Points,
   auto stats_ = {QueryStats.dist_stats(), QueryStats.visited_stats()};
   parlay::sequence<indexType> stats = parlay::flatten(stats_);
   nn_result N(recall, recall_1_100, stats, QPS, k, QP.beamSize, QP.cut, Query_Points.size(),
-              QP.limit, QP.degree_limit, k);
+              QP.limit, QP.degree_limit, k, ndcg, max_max_approximation,
+              max_mean_approximation, max_avg_approximation,
+              mean_max_approximation, mean_mean_approximation,
+              mean_avg_approximation);
   return N;
 }
 
@@ -213,8 +259,7 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
   QueryParams QP;
   QP.limit = (long)G.size();
   QP.degree_limit = (long)G.max_degree();
-  beams = {100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,300,400};
-  // beams = {100};
+  beams = {20,50,100};
   std::vector<int> num_cluster = {1};
   if (k == 0)
     allr = {10};
@@ -227,68 +272,18 @@ void search_and_parse(Graph_ G_, Graph<indexType> &G, PointRange &Base_Points,
     for (float cut : cuts) {
       QP.cut = cut;
       for (float Q : beams) {
-        QP.k = 100;
+        QP.k = Q;
         QP.beamSize = Q;
-        Query_Points.n = 1000;
         QP.num_clusters = nc;
           results.push_back(
               checkRecall<Point, PointRange, QPointRange, indexType>(
                   G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
-                  GT, random, start_point, r, QP, verbose));
+                  GT, random, start_point, Q, QP, verbose));
       }
     }
     for (auto result : results) {
-      std::cout<<result.recall<<",";
-    }
-    std::cout<<std::endl;
-      for (auto result : results) {
-      std::cout<<result.recall_1_100<<",";
-    }
-    std::cout<<std::endl;
-    for (auto result : results) {
-      std::cout<<1/result.QPS<<",";
-    }
-    std::cout<<std::endl;
-    for (auto result : results) {
       result.print();
     }
-    // check "limited accuracy"
-    // {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28,
-    // 30, 35}; //
-    // parlay::sequence<long> limits = calculate_limits(results[0].avg_visited);
-    // parlay::sequence<long> degree_limits = calculate_limits(G.max_degree());
-    // degree_limits.push_back(G.max_degree());
-    // QP = QueryParams(r, r, 1.35, (long)G.size(), (long)G.max_degree());
-    // std::cout << "test2 " << degree_limits.size() << " " << limits.size()
-    //           << std::endl;
-    // for (long l : limits) {
-    //   QP.limit = l;
-    //   QP.beamSize = std::max<long>(l, r);
-    //   for (long dl : degree_limits) {
-    //     QP.degree_limit = dl;
-    //     std::cout << "test2" << std::endl;
-    //     results.push_back(
-    //         checkRecall<Point, PointRange, QPointRange, indexType>(
-    //             G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points,
-    //             GT, random, start_point, r, QP, verbose));
-    //   }
-    // }
-    // // check "best accuracy"
-    // std::cout << "test3" << std::endl;
-    // QP = QueryParams((long)100, (long)1000, (double)10.0, (long)G.size(),
-    //                  (long)G.max_degree());
-    // results.push_back(checkRecall<Point, PointRange, QPointRange, indexType>(
-    //     G, Base_Points, Query_Points, Q_Base_Points, Q_Query_Points, GT,
-    //     random, start_point, r, QP, verbose));
-    //
-    // std::cout << "test4" << std::endl;
-    // parlay::sequence<float> buckets = {
-    //     .1,  .2,  .3,  .4,  .5,  .6,   .7,   .75,   .8,    .85,    .9,
-    //     .93, .95, .97, .98, .99, .995, .999, .9995, .9999, .99995, .99999};
-    // auto [res, ret_buckets] = parse_result(results, buckets);
-    // std::cout << std::endl;
-    // if (res_file != NULL)
-    //   write_to_csv(std::string(res_file), ret_buckets, res, G_);
   }
   std::cout<<"Results for " << nc << " clusters\n";
   }
